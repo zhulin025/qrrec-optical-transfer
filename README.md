@@ -31,6 +31,10 @@ V3 leaves V1 and V2 unchanged and exposes two independent optical channels:
 
 The color-matrix runtime is MPL-2.0 software and remains clearly separated from QRREC's MIT-licensed source. Its license, pinned upstream commit, and integration changes are documented in `v3/color/NOTICE.md` and `v3/color/LICENSE.libcimbar`.
 
+### V4 record-first transfer
+
+V4 separates capture from decoding. The sender repeats a finite, locally verified set of fountain frames and reports both its complete cycle duration and a recommended recording duration. The receiver records camera video without doing live barcode work, releases the camera as soon as recording stops, then samples the local video at 30 frames per second and decodes QR frames in a WASM worker. Processing stops early once the fountain decoder reconstructs and verifies the file. Existing camera recordings can also be imported from the device.
+
 ## Why fountain codes
 
 An optical one-way link has no practical retransmission channel. Frames can be lost to autofocus, motion, screen refresh boundaries, or decoder load. QRREC splits the payload into source blocks and continuously sends deterministic XOR combinations chosen with a Robust Soliton distribution (LT fountain coding). The receiver can recover from any sufficiently large set of distinct encoded frames, regardless of order. A missed frame therefore costs time, not correctness, and there is no fragile fixed cycle that can synchronize with the receiver's sampling period.
@@ -68,6 +72,7 @@ The static site is generated in `release/web-receiver` with these routes:
 - `/` and `/send/`: V1 receiver and sender
 - `/v2/` and `/v2/send/`: V2 receiver and sender
 - `/v3/` and `/v3/send/`: V3 receiver and sender, each with High-speed QR and Color matrix tabs
+- `/v4/` and `/v4/send/`: record-first receiver and fixed-cycle dual-QR sender; decoding runs locally after recording stops
 
 Camera access requires HTTPS except on `localhost`. For phone testing, use an HTTPS development origin or deploy the static build.
 

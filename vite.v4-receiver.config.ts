@@ -1,0 +1,1 @@
+import {defineConfig} from "vite";import {resolve} from "node:path";export default defineConfig({root:resolve(__dirname,"v4/receive"),base:"./",publicDir:false,build:{outDir:resolve(__dirname,"release/web-receiver/v4"),emptyOutDir:false,sourcemap:false,rollupOptions:{input:resolve(__dirname,"v4/receive/index.html")}}});
