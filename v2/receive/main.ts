@@ -46,14 +46,14 @@ let done = false;
 let pulseIndex = 0;
 let stableFrames = 0;
 let filteredFrames = 0;
-let decodeTarget = 900;
+let decodeTarget = 1080;
 let lastDecodedAt = 0;
 let lastTuneAt = 0;
 
 type Point = { x: number; y: number };
 type Position = { topLeft: Point; topRight: Point; bottomLeft: Point; bottomRight: Point };
-type Roi = { x: number; y: number; w: number; h: number; seenAt: number };
-type DecodeTask = { x: number; y: number; w: number; h: number; fullW: number; fullH: number };
+type Roi = { x: number; y: number; w: number; h: number; seenAt: number; lane?: 0 | 1 };
+type DecodeTask = { x: number; y: number; w: number; h: number; fullW: number; fullH: number; lane?: 0 | 1 };
 const rois: Roi[] = [];
 const tasks = new Map<number, DecodeTask>();
 
@@ -360,10 +360,12 @@ function trackRoi(position: Position, task: DecodeTask) {
     w: Math.min(task.fullW, Math.ceil(maxX + pad)) - Math.max(0, Math.floor(minX - pad)),
     h: Math.min(task.fullH, Math.ceil(maxY + pad)) - Math.max(0, Math.floor(minY - pad)),
     seenAt: performance.now(),
+    lane: task.lane,
   };
   const center = (roi: Roi) => ({ x: roi.x + roi.w / 2, y: roi.y + roi.h / 2 });
   const nextCenter = center(next);
   const match = rois.findIndex((roi) => {
+    if (next.lane !== undefined && roi.lane !== next.lane) return false;
     const currentCenter = center(roi);
     return Math.hypot(currentCenter.x - nextCenter.x, currentCenter.y - nextCenter.y) < Math.max(roi.w, next.w) * 0.6;
   });
@@ -433,10 +435,18 @@ function captureFrame() {
         mainThreadDecodeBusy = false;
       });
   } else {
+    // Start with two overlapping search lanes. Waiting for a full-frame scan
+    // to recognize both dense symbols at once creates an ROI startup deadlock.
+    const overlap = Math.round(decodeWidth * 0.12);
+    const half = Math.ceil(decodeWidth / 2);
+    const searchRois: Roi[] = [
+      { x: 0, y: 0, w: Math.min(decodeWidth, half + overlap), h: decodeHeight, seenAt: now, lane: 0 },
+      { x: Math.max(0, half - overlap), y: 0, w: decodeWidth - Math.max(0, half - overlap), h: decodeHeight, seenAt: now, lane: 1 },
+    ];
     const dispatch = (slot: number, roi?: Roi) => {
       const crop = roi ? ctx.getImageData(roi.x, roi.y, roi.w, roi.h) : img;
       const task: DecodeTask = roi
-        ? { x: roi.x, y: roi.y, w: roi.w, h: roi.h, fullW: decodeWidth, fullH: decodeHeight }
+        ? { x: roi.x, y: roi.y, w: roi.w, h: roi.h, fullW: decodeWidth, fullH: decodeHeight, lane: roi.lane }
         : { x: 0, y: 0, w: decodeWidth, h: decodeHeight, fullW: decodeWidth, fullH: decodeHeight };
       const id = frameId++;
       busy[slot] = true;
@@ -448,8 +458,12 @@ function captureFrame() {
       dispatch(freeSlots[1]!, rois[1]);
     } else if (rois.length === 2) {
       dispatch(freeSlots[0]!, rois[frameId % 2]);
+    } else if (freeSlots.length >= 2) {
+      dispatch(freeSlots[0]!, rois.find((roi) => roi.lane === 0) ?? searchRois[0]);
+      dispatch(freeSlots[1]!, rois.find((roi) => roi.lane === 1) ?? searchRois[1]);
     } else {
-      dispatch(freeSlots[0]!);
+      const lane = frameId % 2 as 0 | 1;
+      dispatch(freeSlots[0]!, rois.find((roi) => roi.lane === lane) ?? searchRois[lane]);
     }
   }
 }
@@ -581,12 +595,12 @@ function updateStats() {
   metric("m-cap").textContent = (captureTimes.length / 2).toFixed(0);
   metric("m-dec").textContent = (decodeTimes.length / 2).toFixed(1);
   metric("m-stable").textContent = `${stableFrames}/${filteredFrames}`;
-  metric("m-roi").textContent = rois.length === 2 ? "双 ROI" : rois.length === 1 ? "定位 1/2" : "整帧搜索";
+  metric("m-roi").textContent = rois.length === 2 ? "双 ROI" : rois.length === 1 ? "定位 1/2" : "左右并行搜索";
   if (lastDecodedAt && now - lastDecodedAt > 2800 && now - lastTuneAt > 2500 && decodeTarget < 1120) {
     decodeTarget += 80;
     rois.length = 0;
     lastTuneAt = now;
-  } else if (decodeTimes.length >= 20 && now - lastTuneAt > 3000 && decodeTarget > 820) {
+  } else if (decodeTimes.length >= 20 && now - lastTuneAt > 3000 && decodeTarget > 900) {
     decodeTarget -= 40;
     rois.length = 0;
     lastTuneAt = now;

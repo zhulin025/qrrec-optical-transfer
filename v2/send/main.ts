@@ -39,9 +39,10 @@ async function main() {
   fileInput.addEventListener("change", () => {
     selectedFile = fileInput.files?.[0] ?? null;
     if (selectedFile && cfgBytes.dataset.tuned !== "true") {
-      const pixels = Math.min(screen.width * devicePixelRatio, screen.height * devicePixelRatio);
-      cfgBytes.value = pixels >= 1200 ? "2331" : "1850";
-      cfgFps.value = pixels >= 900 ? "30" : "24";
+      const codeCount = Number(cfgCodes.value);
+      const cssPixelsPerCode = (innerWidth - 54) / codeCount;
+      cfgBytes.value = codeCount === 2 ? (cssPixelsPerCode >= 800 ? "1465" : "1000") : "1850";
+      cfgFps.value = codeCount === 2 ? "20" : "24";
       cfgBytes.dataset.tuned = "true";
     }
     fileInfo.textContent = selectedFile ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}` : "尚未选择文件";

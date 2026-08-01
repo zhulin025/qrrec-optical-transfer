@@ -62,7 +62,7 @@ Camera access requires HTTPS except on `localhost`. For phone testing, use an HT
 
 ## Tuning and expectations
 
-The effective rate depends on screen refresh rate and brightness, camera exposure/focus, QR density, distance, worker performance, and how much the file compresses. V2 defaults to two codes, 30 display ticks per second, and up to 2331 bytes per code on a capable display. If recognition is unstable, try one code, fewer bytes per frame, a lower frame rate, or a larger display size.
+The effective rate depends on screen refresh rate and brightness, camera exposure/focus, QR density, distance, worker performance, and how much the file compresses. V2 defaults to a stable dual-code profile: 20 display ticks per second and 1000 bytes per code, automatically rising to 1465 bytes only when each code has ample display area. If recognition is unstable, try one code, fewer bytes per frame, a lower frame rate, or a larger display size.
 
 Dual QR mode doubles the offered payload but does not guarantee double goodput: both codes must remain large and sharp enough for the camera. The live metrics show captured frames, successful decodes, new versus duplicate fountain frames, stable versus filtered frames, ROI state, and estimated useful throughput.
 

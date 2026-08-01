@@ -29,7 +29,12 @@ ctx.onmessage = async (e: MessageEvent) => {
   const { id, buf, w, h } = e.data as { id: number; buf: ArrayBuffer; w: number; h: number };
   try {
     const img = new ImageData(new Uint8ClampedArray(buf), w, h);
-    const results = await readBarcodes(img, { formats: ["QRCode"], maxNumberOfSymbols: 2 });
+    const results = await readBarcodes(img, {
+      formats: ["QRCode"],
+      maxNumberOfSymbols: 2,
+      tryDenoise: true,
+      tryDownscale: false,
+    });
     const decoded = results
       .filter((result) => result.isValid && result.bytes.length > 0)
       .map((result) => ({ bytes: result.bytes, position: result.position }));
