@@ -23,7 +23,7 @@
     "build:receiver:xhs": "vite build --config vite.receiver-xhs.config.ts",
     "generate:wasm-inline": "node scripts/generate_inline_wasm.mjs",
     "build:receiver:xhs:inline": "npm run generate:wasm-inline && vite build --config vite.receiver-xhs-inline.config.ts",
-    "build:web": "npm run build:receiver && npm run build:sender:web && npm run build:receiver:v2 && npm run build:sender:v2 && npm run build:receiver:v3 && npm run build:sender:v3 && npm run build:color:v3 && npm run build:receiver:v4 && npm run build:sender:v4",
+    "build:web": "npm run build:receiver && npm run build:sender:web && npm run build:receiver:v2 && npm run build:sender:v2 && npm run build:receiver:v3 && npm run build:sender:v3 && npm run build:color:v3 && npm run build:receiver:v4 && npm run build:sender:v4 && npm run build:sender:v5",
     "build:release": "npm run build:sender && npm run build:web",
     "preview": "vite preview",
     "preview:receiver": "vite preview --config vite.receiver-web.config.ts"

@@ -152,7 +152,7 @@ iOS 接收端使用 Xcode 打开 [`v5/ios/OpticalReceiverV5/OpticalReceiverV5.xc
 - `/v2/` 与 `/v2/send/`：V2 接收端与发送端。
 - `/v3/` 与 `/v3/send/`：V3 接收端与发送端，页面内可切换高速双 QR 和彩色矩阵。
 - `/v4/` 与 `/v4/send/`：V4 录像接收端与固定循环双 QR 发送端。
-- V5 发送端当前是本地构建产物 `release/v5/sender/`；接收端为 iOS App，不提供网页路由。
+- `/v5/send/`：V5 libcimbar 网页发送端；接收端为 iOS App，不提供网页接收路由。
 
 手机调试摄像头时需要 HTTPS 开发地址；普通局域网 HTTP 地址通常无法获得摄像头权限。
 

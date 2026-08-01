@@ -24,7 +24,7 @@ export default defineConfig({
   }],
   build: {
     modulePreload: { polyfill: false },
-    outDir: resolve(__dirname, "release/v5/sender"),
+    outDir: resolve(__dirname, "release/web-receiver/v5/send"),
     emptyOutDir: true,
     sourcemap: false,
     rollupOptions: {

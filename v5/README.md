@@ -8,7 +8,7 @@ V5 uses the libcimbar-compatible color-matrix runtime already vendored in V3. Th
 npm run dev:sender:v5
 ```
 
-Build with `npm run build:sender:v5`. No deployment is performed.
+Build with `npm run build:sender:v5`; output is written to `release/web-receiver/v5/send/` so the repository's normal Vercel build can publish `/v5/send/`.
 
 ## iOS receiver
 
