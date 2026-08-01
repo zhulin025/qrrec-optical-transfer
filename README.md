@@ -1,100 +1,160 @@
-# QRREC Optical Transfer
+# QRREC 光学文件传输
 
-QRREC lets two devices transfer files through a screen and a camera. The sender turns a file into an endless animated QR stream; the receiver scans any useful frames, reconstructs the file, verifies it, and previews images, video, or text locally. File bytes never pass through a server.
+QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发送端把文件编码成连续播放的二维码或彩色矩阵，接收端采集有效画面、重组并校验文件，整个过程都在浏览器本地完成，文件内容不会上传服务器。
 
-## Online demo
+## 四个版本概览
 
-| Version | Receiver | Sender | Purpose |
-| --- | --- | --- | --- |
-| V1 | [qrrec.liuwa.xyz](https://qrrec.liuwa.xyz/) | [qrrec.liuwa.xyz/send/](https://qrrec.liuwa.xyz/send/) | Stable baseline |
-| V2 | [qrrec.liuwa.xyz/v2/](https://qrrec.liuwa.xyz/v2/) | [qrrec.liuwa.xyz/v2/send/](https://qrrec.liuwa.xyz/v2/send/) | High-speed experimental path |
-| V3 | [qrrec.liuwa.xyz/v3/](https://qrrec.liuwa.xyz/v3/) | [qrrec.liuwa.xyz/v3/send/](https://qrrec.liuwa.xyz/v3/send/) | 30 FPS dual QR plus color-matrix channel |
+| 版本 | 核心定位 | 主要特点 | 适合场景 | 在线入口 |
+| --- | --- | --- | --- | --- |
+| **V1 稳定基础版** | 兼容性与稳定性优先 | 单路动态 QR、喷泉码抗丢帧、本地文件校验、图片/视频/文本预览与下载 | 首次使用、设备性能一般、需要稳定传输 | [接收端](https://qrrec.liuwa.xyz/) · [发送端](https://qrrec.liuwa.xyz/send/) |
+| **V2 自适应高速版** | 在标准 QR 协议上提高吞吐量 | 双 QR 并行、自适应载荷与帧率、自动 gzip 压缩、稳定帧过滤、双 ROI/多 Worker 解码、PWA 接收端 | 屏幕较大、光线稳定、希望获得比 V1 更高的速度 | [接收端](https://qrrec.liuwa.xyz/v2/) · [发送端](https://qrrec.liuwa.xyz/v2/send/) |
+| **V3 多通道实验版** | 继续优化实时接收，并探索彩色高密度编码 | 高速双 QR、画面指纹去重、重叠 ROI 并行搜索；另带 libcimbar 彩色矩阵通道、实时速率/进度/解码统计、完成后媒体预览 | 测试高性能实时传输，或比较双 QR 与彩色矩阵效果 | [接收端](https://qrrec.liuwa.xyz/v3/) · [发送端](https://qrrec.liuwa.xyz/v3/send/) |
+| **V4 先录像后解码版** | 把摄像头采集和 QR 解码分成两个阶段 | 发送端生成有限且可验证的循环并给出建议录像时长；接收端先录像或导入已有视频，停止拍摄后再以 30 FPS 本地离线解码，重组成功即可提前结束 | 手机实时解码跟不上、需要先稳定录下画面再慢慢处理 | [接收端](https://qrrec.liuwa.xyz/v4/) · [发送端](https://qrrec.liuwa.xyz/v4/send/) |
 
-Open the sender on a laptop or another bright screen, select a file, then open the matching receiver on a phone and point its camera at the animated codes. V1 and V2 use different file envelopes; use the matching sender and receiver.
+### 怎么选择
 
-## V2 features
+- 优先稳定、第一次使用：选择 **V1**。
+- 想用标准二维码获得更高实时速度：选择 **V2**。
+- 想查看更多实时指标，或测试彩色矩阵：选择 **V3**。
+- 实时解码容易掉帧，但手机录像清晰：选择 **V4**。
 
-- **Adaptive high-speed parameters** — the sender selects a dense payload and frame rate from the display capability; the receiver raises decode resolution when it cannot find codes and backs off after sustained success.
-- **Stable-frame detection** — once both codes are located, frames with excessive mid-tone/blur-like pixels are discarded before expensive WASM decoding.
-- **Dual ROI decoding** — the receiver first searches the full frame, then assigns the two located QR regions to separate workers. This reduces pixels processed per decode and allows two data frames per display tick.
-- **Transparent compression** — gzip is used only when it actually reduces the payload. The receiver restores and validates the original bytes automatically.
-- **Dual QR mode** — two independent fountain frames are displayed side by side. Single-code mode remains available for difficult camera or display conditions.
-- **Local result preview** — images, playable video, text, and URLs are shown in the browser; downloading remains an explicit user action.
-- **PWA receiver** — the receiver can be installed and its shell is cached for repeat use. Camera access still requires HTTPS.
+> 不同版本和不同通道的封装或协议可能不兼容，请始终使用同一版本、同一模式的发送端和接收端。
 
-## V3 modes
+## 快速使用
 
-V3 leaves V1 and V2 unchanged and exposes two independent optical channels:
+1. 在电脑或另一块较亮的屏幕上打开某个版本的发送端。
+2. 选择需要发送的图片、视频、文档或压缩包。
+3. 在手机上打开相同版本的接收端，并允许摄像头权限。
+4. 让二维码或彩色矩阵完整进入取景框，保持画面稳定并避免反光。
+5. 接收完成后可在本地预览支持的媒体，并手动下载文件。
 
-- **Optimized dual QR** at `/v3/` and `/v3/send/`: 30 display ticks per second, overlapping left/right ROI acquisition, two parallel decode workers, stable-frame filtering, and a 128-sample visual fingerprint that avoids spending decode time on the same displayed frame twice.
-- **Color matrix (experimental)** is available as an in-page tab on `/v3/` and `/v3/send/`. It reuses the encoding/decoding runtime from `sz3/libcimbar` (shape and color symbols, Reed–Solomon correction, interleaving, Wirehair fountain coding, and zstd compression) while keeping QRREC's own interface. This channel is protocol-incompatible with QRREC's QR modes; use the color-matrix tab on both ends.
+摄像头权限通常要求 HTTPS；`localhost` 本地开发环境除外。
 
-The color-matrix runtime is MPL-2.0 software and remains clearly separated from QRREC's MIT-licensed source. Its license, pinned upstream commit, and integration changes are documented in `v3/color/NOTICE.md` and `v3/color/LICENSE.libcimbar`.
+## 各版本详细功能
 
-### V4 record-first transfer
+### V1：稳定基础版
 
-V4 separates capture from decoding. The sender repeats a finite, locally verified set of fountain frames and reports both its complete cycle duration and a recommended recording duration. The receiver records camera video without doing live barcode work, releases the camera as soon as recording stops, then samples the local video at 30 frames per second and decodes QR frames in a WASM worker. Processing stops early once the fountain decoder reconstructs and verifies the file. Existing camera recordings can also be imported from the device.
+V1 保留项目最基础、直接的实时光学传输路径：发送端持续生成喷泉编码 QR 帧，接收端通过摄像头扫描并重组文件。它适合作为兼容性基准，也方便在 V2/V3 参数过于激进时回退使用。
 
-## Why fountain codes
+- 单路动态二维码，画面更大、更容易识别。
+- LT 喷泉码允许乱序接收并容忍丢帧。
+- 使用哈希验证重组后的文件是否正确。
+- 文件编码、解码、预览和下载都在浏览器本地完成。
+- 支持图片、视频、文本或网址等结果预览。
 
-An optical one-way link has no practical retransmission channel. Frames can be lost to autofocus, motion, screen refresh boundaries, or decoder load. QRREC splits the payload into source blocks and continuously sends deterministic XOR combinations chosen with a Robust Soliton distribution (LT fountain coding). The receiver can recover from any sufficiently large set of distinct encoded frames, regardless of order. A missed frame therefore costs time, not correctness, and there is no fragile fixed cycle that can synchronize with the receiver's sampling period.
+### V2：自适应高速版
 
-Each frame carries a compact 20-byte binary header containing the session id, sequence number, source block count, block size, payload length, and hash. The sequence number seeds the same deterministic block selection on both devices; it is not merely an index into a repeating list.
+V2 在标准 QR 路径上增加双码并行、压缩和接收端性能优化。
 
-## Architecture
+- **自适应高速参数**：发送端根据显示能力选择载荷密度和帧率；接收端会在定位困难时提高解码分辨率，并在持续成功后降低开销。
+- **双 QR 模式**：左右两个二维码同时承载独立喷泉帧；识别困难时仍可切换单码模式。
+- **稳定帧检测**：定位成功后，提前丢弃模糊、过渡或残影明显的画面，减少无效 WASM 解码。
+- **双 ROI 解码**：先进行全画面搜索，再把两个二维码区域交给独立 Worker 并行处理，减少每次扫描的像素量。
+- **透明压缩**：仅当 gzip 确实能缩小文件时才启用，接收端自动解压并验证原始数据。
+- **本地结果展示**：图片、视频、文本和网址可直接预览，下载仍由用户主动触发。
+- **PWA 接收端**：网页外壳可安装并缓存，重复使用更方便；摄像头仍需要安全环境。
+
+### V3：高速双 QR + 彩色矩阵
+
+V3 不改变 V1/V2，而是在同一页面提供两个相互独立的光学通道。
+
+#### 高速双 QR
+
+- 默认面向 30 FPS 显示与采集场景。
+- 左右重叠 ROI 搜索和两个并行解码 Worker。
+- 稳定帧过滤，减少屏幕刷新边界产生的残影帧。
+- 使用 128 点画面指纹避免重复解码同一个显示帧。
+- 实时展示有效帧、重复帧、接收进度和估算吞吐量。
+
+#### 彩色矩阵（实验）
+
+- 复用 [sz3/libcimbar](https://github.com/sz3/libcimbar) 的形状/颜色符号、Reed–Solomon 纠错、交织、Wirehair 喷泉码和 zstd 压缩能力。
+- 发送端默认 15 FPS，并保留 libcimbar 原有的轻微位置抖动；该抖动用于帮助接收端排除跨帧残影，不是普通二维码动画错误。
+- 接收端展示传输速率、已用时间、进度、采集/提交、有效帧、未识别、定位丢弃和解码错误。
+- 文件接收完成后停止继续解码；图片和视频可直接在页面中预览。
+- 彩色矩阵与 QRREC 的标准 QR 通道协议不兼容，发送和接收两端必须同时选择“彩色矩阵”。
+
+彩色矩阵运行层采用 MPL-2.0 许可证，并与 QRREC 的 MIT 源码分开放置。固定的上游提交、许可证和集成修改记录见 [`v3/color/NOTICE.md`](v3/color/NOTICE.md) 与 [`v3/color/LICENSE.libcimbar`](v3/color/LICENSE.libcimbar)。
+
+### V4：先录像、后离线解码
+
+V4 将摄像头采集和二维码解码拆成两个阶段，避免实时解码性能影响录像质量。
+
+- 发送端预先生成有限、可本地验证的喷泉帧集合，并循环播放。
+- 页面显示完整循环时长和建议录像时长，默认额外保留 3 秒边缘余量。
+- 接收端录像时不进行繁重的条码识别，停止后立即释放摄像头。
+- 支持直接录制摄像头画面，也支持导入设备中已有的录像。
+- 本地视频按 30 FPS 采样并交给 WASM Worker 解码。
+- 喷泉解码器一旦重组并校验成功，会提前停止后续视频分析。
+- 完成后支持图片、视频预览和文件下载。
+
+## 为什么使用喷泉码
+
+单向光学链路没有实用的重传通道。自动对焦、设备移动、屏幕刷新边界和解码器负载都可能导致帧丢失。
+
+QRREC 把数据拆成源块，再依据 Robust Soliton 分布持续发送确定性的异或组合，也就是 LT 喷泉编码。接收端只需收集足够多的不同有效帧，不要求顺序连续。漏掉一帧通常只会增加接收时间，不会直接造成文件损坏，也不会依赖容易与摄像头采样周期同步冲突的固定帧序列。
+
+标准 QR 通道的每帧带有紧凑的 20 字节二进制头，包含会话 ID、序列号、源块数量、块大小、总载荷长度和哈希。序列号用于在两端确定性地选择相同源块，而不只是循环帧的索引。
+
+## 标准 QR 通道架构
 
 ```text
-file → optional gzip → V2 envelope → source blocks → Robust Soliton LT encoder
-     → one/two animated QR codes → camera → stable-frame filter → full-frame search
-     → dual ROI workers → ZXing WASM → LT peeling decoder → hash check
-     → optional gunzip → browser preview / optional download
+文件 → 可选 gzip → 文件封装 → 源数据块 → Robust Soliton LT 编码
+     → 单个/两个动态二维码 → 摄像头 → 稳定帧过滤 → 全画面定位
+     → ROI Worker → ZXing WASM → LT 剥离解码 → 哈希校验
+     → 可选 gunzip → 浏览器预览 / 手动下载
 ```
 
-Safari does not provide a dependable cross-browser native QR detector, so the receiver uses [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) through [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) in Web Workers. Web builds load WASM as a separate cacheable asset for fast Worker startup; the Xiaohongshu-specific build can embed it into JavaScript for hosts that reject standalone `.wasm` files.
+Safari 没有提供可靠的跨浏览器原生 QR 解码器，因此接收端通过 [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) 在 Web Worker 中运行 [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp)。网页版本把 WASM 作为可独立缓存的资源加载；针对某些不允许单独托管 `.wasm` 的宿主，也保留了将 WASM 内嵌进 JavaScript 的构建方式。
 
-## Local development
+## 本地开发
 
-Requirements: Node.js 20 or newer and a modern browser.
+环境要求：Node.js 20 或更高版本，以及现代浏览器。
 
 ```bash
 npm install
 npm run dev
 ```
 
-For a production build:
+生产构建：
 
 ```bash
 npm run build:web
 ```
 
-The static site is generated in `release/web-receiver` with these routes:
+静态文件会生成到 `release/web-receiver`，主要路由如下：
 
-- `/` and `/send/`: V1 receiver and sender
-- `/v2/` and `/v2/send/`: V2 receiver and sender
-- `/v3/` and `/v3/send/`: V3 receiver and sender, each with High-speed QR and Color matrix tabs
-- `/v4/` and `/v4/send/`: record-first receiver and fixed-cycle dual-QR sender; decoding runs locally after recording stops
+- `/` 与 `/send/`：V1 接收端与发送端。
+- `/v2/` 与 `/v2/send/`：V2 接收端与发送端。
+- `/v3/` 与 `/v3/send/`：V3 接收端与发送端，页面内可切换高速双 QR 和彩色矩阵。
+- `/v4/` 与 `/v4/send/`：V4 录像接收端与固定循环双 QR 发送端。
 
-Camera access requires HTTPS except on `localhost`. For phone testing, use an HTTPS development origin or deploy the static build.
+手机调试摄像头时需要 HTTPS 开发地址；普通局域网 HTTP 地址通常无法获得摄像头权限。
 
-## Tuning and expectations
+## 性能调节与预期
 
-The effective rate depends on screen refresh rate and brightness, camera exposure/focus, QR density, distance, worker performance, and how much the file compresses. V2 defaults to a stable dual-code profile: 20 display ticks per second and 1000 bytes per code, automatically rising to 1465 bytes only when each code has ample display area. If recognition is unstable, try one code, fewer bytes per frame, a lower frame rate, or a larger display size.
+实际速度取决于屏幕刷新率、亮度、反光、二维码尺寸、摄像头曝光与对焦、设备性能、Worker 调度，以及文件是否容易压缩。
 
-Dual QR mode doubles the offered payload but does not guarantee double goodput: both codes must remain large and sharp enough for the camera. The live metrics show captured frames, successful decodes, new versus duplicate fountain frames, stable versus filtered frames, ROI state, and estimated useful throughput.
+V2 默认使用稳定双码配置：20 个显示节拍/秒、每码 1000 字节；当单码显示面积足够大时可自动提高到 1465 字节。如果识别不稳定，可尝试改成单码、降低单帧字节数或帧率、增大二维码显示面积，并提高屏幕亮度。
 
-## Project lineage
+双 QR 能提高发送端提供的数据量，但不保证有效速度严格翻倍，因为两个二维码都必须保持足够大且清晰。实时指标中的采集帧、成功解码、新帧/重复帧、过滤帧、ROI 状态和估算速率，更适合用来判断真实瓶颈。
 
-This repository builds on the original MIT-licensed **Decimen Optical Transfer** proof of concept and keeps its compact binary protocol, deterministic fountain implementation, and optical-only design. The UI/PWA and preview workflow were informed by Qrs. Related projects worth studying include [txqr](https://github.com/divan/txqr), [airgapped-qr-code-transfer](https://github.com/mohankumarelec/airgapped-qr-code-transfer), and [libcimbar](https://github.com/sz3/libcimbar), which uses a purpose-built high-density color barcode rather than standard QR.
+V3 彩色矩阵是实验通道。它的识别效果对屏幕、摄像头、距离、反光和刷新残影更敏感；默认的轻微位置变化属于上游定位策略，不建议关闭。
 
-Built with [node-qrcode](https://github.com/soldair/node-qrcode), [zxing-wasm](https://github.com/Sec-ant/zxing-wasm), and [fflate](https://github.com/101arrowz/fflate).
+## 隐私与限制
 
-## Privacy and limitations
+- QRREC 不上传文件内容；编码、解码、解压、校验和预览都在本地浏览器完成。
+- 首次打开在线页面仍需要正常网络连接来加载网页、JavaScript 和 WASM 资源。
+- 任何能够看到并完整录制动态光码的人，都可能重组文件；光学传输本身不等于加密。
+- 各版本应配套使用；不要混用不同版本或不同通道的发送端与接收端。
+- V2、V3 和 V4 包含实验性性能路径，遇到兼容性问题时可回到 V1。
 
-- No file content is uploaded by QRREC; all encoding and decoding happens in the browser.
-- The deployed web shell still needs normal network access to load on first visit.
-- Anyone who can see and record the animated codes can reconstruct the file. Optical transfer is not encryption.
-- V2 is an experimental performance path. Keep V1 available as the compatibility baseline.
+## 项目来源与依赖
 
-## License
+本项目基于原始的 MIT 许可 **Decimen Optical Transfer** 概念验证，保留其紧凑二进制协议、确定性喷泉编码与纯光学传输设计。界面、PWA 和预览流程参考了 Qrs。相关项目包括 [txqr](https://github.com/divan/txqr)、[airgapped-qr-code-transfer](https://github.com/mohankumarelec/airgapped-qr-code-transfer) 和使用高密度彩色条码的 [libcimbar](https://github.com/sz3/libcimbar)。
 
-QRREC's own source is MIT; see [LICENSE](LICENSE). The separated libcimbar web runtime under `v3/color/` is MPL-2.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+主要依赖：[node-qrcode](https://github.com/soldair/node-qrcode)、[zxing-wasm](https://github.com/Sec-ant/zxing-wasm) 和 [fflate](https://github.com/101arrowz/fflate)。
+
+## 许可证
+
+QRREC 自有源码使用 MIT 许可证，详见 [`LICENSE`](LICENSE)。`v3/color/` 下独立分发的 libcimbar 浏览器运行层使用 MPL-2.0，详见 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
