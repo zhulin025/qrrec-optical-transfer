@@ -127,8 +127,8 @@ function ensureWorkers(workerCount: number): Promise<boolean> {
       resolve(ok);
     };
     const timeout = window.setTimeout(
-      () => finish(false, "初始化超过 30 秒，请检查浏览器兼容性或重新打开页面"),
-      30_000,
+      () => finish(false, "初始化超过 60 秒，请检查网络或重新打开页面"),
+      60_000,
     );
 
     const startWorker = (slot: number) => {

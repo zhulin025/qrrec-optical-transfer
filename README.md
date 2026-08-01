@@ -36,7 +36,7 @@ file → optional gzip → V2 envelope → source blocks → Robust Soliton LT e
      → optional gunzip → browser preview / optional download
 ```
 
-Safari does not provide a dependable cross-browser native QR detector, so the receiver uses [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) through [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) in Web Workers. The WASM binary is embedded into JavaScript so the same build works on hosts that reject standalone `.wasm` files.
+Safari does not provide a dependable cross-browser native QR detector, so the receiver uses [zxing-cpp](https://github.com/zxing-cpp/zxing-cpp) through [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) in Web Workers. Web builds load WASM as a separate cacheable asset for fast Worker startup; the Xiaohongshu-specific build can embed it into JavaScript for hosts that reject standalone `.wasm` files.
 
 ## Local development
 

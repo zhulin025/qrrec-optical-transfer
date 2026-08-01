@@ -3,9 +3,10 @@
 // One frame in flight per worker; the main thread drops frames when all
 // workers are busy. Frames are disposable — the fountain doesn't care.
 
-// The generated module contains the real decoder binary as a Base64 data URL.
-// This keeps the upload package free of standalone `.wasm` files.
-import { zxingWasmDataUrl as wasmUrl } from "./zxing-wasm-inline.generated";
+// Web builds keep WASM as a separate browser-cacheable asset. Inlining it as
+// Base64 makes the worker large and can exceed the startup timeout on mobile
+// networks. The XHS main-thread build still uses the generated inline module.
+import wasmUrl from "../node_modules/zxing-wasm/dist/reader/zxing_reader.wasm?url";
 import { prepareZXingModule, readBarcodes } from "zxing-wasm/reader";
 
 const moduleReady = Promise.resolve(prepareZXingModule({
