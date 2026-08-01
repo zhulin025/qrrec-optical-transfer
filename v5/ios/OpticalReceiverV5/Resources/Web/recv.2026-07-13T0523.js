@@ -141,7 +141,6 @@ var Recv = function () {
   var _cameraProfile = "清晰";
   var _profileChanges = 0;
   var _lastAdaptation = performance.now();
-  var _decodeTimes = [];
 
   function reportPipeline(force) {
     const now = performance.now();
@@ -151,8 +150,7 @@ var Recv = function () {
     const weight = Math.min(1, elapsed / 1.5);
     _captureFps += (((_capturedFrames - _lastRateCaptured) / elapsed) - _captureFps) * weight;
     _submitFps += (((_submittedFrames - _lastRateSubmitted) / elapsed) - _submitFps) * weight;
-    _decodeTimes = _decodeTimes.filter(t => now - t <= 5000);
-    _decodeFps = _decodeTimes.length / Math.min(5, Math.max((now - _pipelineStartedAt) / 1000, 1));
+    _decodeFps += (((_decodedFrames - _lastRateDecoded) / elapsed) - _decodeFps) * weight;
     _lastRateAt = now;
     _lastRateCaptured = _capturedFrames;
     _lastRateSubmitted = _submittedFrames;
@@ -329,7 +327,6 @@ var Recv = function () {
         _captureFps = 0; _submitFps = 0; _decodeFps = 0;
         _droppedFrames = 0; _roiWidth = 0; _roiHeight = 0; _pixelFormat = "unknown";
         _cameraProfile = "清晰"; _profileChanges = 0; _lastAdaptation = performance.now();
-        _decodeTimes = [];
       }
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
@@ -493,7 +490,6 @@ var Recv = function () {
       }
       if (buff.length > 0) {
         _decodedFrames += 1;
-        _decodeTimes.push(performance.now());
         reportPipeline(true);
         Recv.setMode(data.mode); // call *before* we send it to the sink. This is our autodetect confirm.
       }

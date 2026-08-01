@@ -30,7 +30,6 @@ final class ReceiverModel: ObservableObject {
     @Published var completedBytes = 0
     @Published var isRunning = false
     fileprivate var sessionStartedAt = Date()
-    fileprivate var rateSamples: [(Date, Int)] = []
 
     func beginSession() {
         status = "正在启动本地解码器…"
@@ -39,7 +38,6 @@ final class ReceiverModel: ObservableObject {
         captureFPS = 0; submitFPS = 0; decodeFPS = 0; decodedBytes = 0; progress = 0
         completedName = nil; completedBytes = 0
         transferRate = 0; sessionStartedAt = Date()
-        rateSamples = []
         dropped = 0; roiWidth = 0; roiHeight = 0; pixelFormat = "--"; cameraProfile = "清晰"
     }
 
@@ -152,13 +150,9 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                     else if self.model.noData > 0 { self.model.status = "已定位矩阵，正在提取有效数据…" }
                     else if self.model.rejected > 0 { self.model.status = "正在扫描画面 · 请保持四角完整清晰" }
                 case "decoded-frame":
-                    let bytes = Self.int(info["bytes"])
-                    let now = Date()
-                    self.model.decodedBytes += bytes
-                    self.model.rateSamples.append((now, bytes))
-                    self.model.rateSamples.removeAll { now.timeIntervalSince($0.0) > 5 }
-                    let elapsed = max(min(5, now.timeIntervalSince(self.model.sessionStartedAt)), 1)
-                    self.model.transferRate = Double(self.model.rateSamples.reduce(0) { $0 + $1.1 }) / elapsed
+                    self.model.decodedBytes += Self.int(info["bytes"])
+                    let elapsed = max(Date().timeIntervalSince(self.model.sessionStartedAt), 0.001)
+                    self.model.transferRate = Double(self.model.decodedBytes) / elapsed
                     self.model.status = "正在接收文件…"
                 case "progress":
                     let values = (info["values"] as? [NSNumber])?.map(\.doubleValue) ?? []
