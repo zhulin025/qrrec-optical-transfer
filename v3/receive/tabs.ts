@@ -1,6 +1,9 @@
 export {};
 
 const nav = document.querySelector<HTMLElement>(".v3-mode-nav")!;
+const colorRuntimeUrl = import.meta.env.DEV
+  ? "../color/runtime-recv.html?v=2"
+  : "./color/runtime-recv.html?v=2";
 const scripts = new Set([...document.querySelectorAll("body > script")]);
 const qrPanel = document.createElement("section");
 qrPanel.className = "v3-tab-panel";
@@ -33,9 +36,14 @@ colorPanel.innerHTML = `
     <div class="metric"><div class="k">传输速率</div><div class="v amber" id="color-rate">—</div></div>
     <div class="metric"><div class="k">已用时间</div><div class="v" id="color-time">—</div></div>
     <div class="metric"><div class="k">传输进度</div><div class="v amber" id="color-percent">0%</div></div>
+    <div class="metric"><div class="k">采集／提交</div><div class="v" id="color-pipeline-capture">0 / 0</div></div>
+    <div class="metric"><div class="k">有效帧</div><div class="v amber" id="color-pipeline-decoded">0</div></div>
+    <div class="metric"><div class="k">未识别</div><div class="v" id="color-pipeline-nodata">0</div></div>
+    <div class="metric"><div class="k">残影／定位丢弃</div><div class="v" id="color-pipeline-rejected">0</div></div>
+    <div class="metric"><div class="k">解码错误</div><div class="v" id="color-pipeline-errors">0</div></div>
   </div>
   <div class="preview" id="color-preview" style="display:none">
-    <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="./color/runtime-recv.html?v=1"></iframe></div>
+    <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="${colorRuntimeUrl}"></iframe></div>
     <div class="scan-guide"><span></span></div>
   </div>
   <section class="transfer-progress" id="color-progress" style="display:none">
@@ -58,6 +66,7 @@ let bytes = 0;
 let colorRuntimeReady = false;
 let colorDone = false;
 let colorStartedAt = 0;
+let colorFirstDataAt = 0;
 let colorResultUrl = "";
 const pulseContainer = colorPanel.querySelector<HTMLElement>("#color-frame-pulses")!;
 const pulses = Array.from({ length: 24 }, () => pulseContainer.appendChild(document.createElement("span")));
@@ -75,6 +84,7 @@ start.addEventListener("click", () => {
   frames = 0;
   bytes = 0;
   colorStartedAt = performance.now();
+  colorFirstDataAt = 0;
   pulseIndex = 0;
   pulses.forEach((pulse) => pulse.classList.remove("active"));
   start.style.display = "none";
@@ -90,6 +100,11 @@ start.addEventListener("click", () => {
   colorPanel.querySelector("#color-rate")!.textContent = "—";
   colorPanel.querySelector("#color-time")!.textContent = "—";
   colorPanel.querySelector("#color-percent")!.textContent = "0%";
+  colorPanel.querySelector("#color-pipeline-capture")!.textContent = "0 / 0";
+  colorPanel.querySelector("#color-pipeline-decoded")!.textContent = "0";
+  colorPanel.querySelector("#color-pipeline-nodata")!.textContent = "0";
+  colorPanel.querySelector("#color-pipeline-rejected")!.textContent = "0";
+  colorPanel.querySelector("#color-pipeline-errors")!.textContent = "0";
   colorPanel.querySelector("#color-progress-value")!.textContent = "0%";
   colorPanel.querySelector("#color-progress-copy")!.textContent = "等待有效数据";
   colorPanel.querySelector<HTMLElement>("#color-bar")!.style.width = "0%";
@@ -106,12 +121,14 @@ window.addEventListener("message", (event) => {
     stats.textContent = "解码器已就绪，正在申请摄像头";
   } else if (message.type === "camera-ready") {
     capability("color-cap-camera", "pass", "通过");
-    stats.textContent = `摄像头 ${message.width}×${message.height} · 等待彩色矩阵`;
+    const fps = Number(message.frameRate) || 0;
+    stats.textContent = `摄像头 ${message.width}×${message.height}${fps ? `@${fps.toFixed(0)}` : ""} · 等待彩色矩阵`;
   } else if (message.type === "decoded-frame") {
     if (colorDone) return;
+    if (!colorFirstDataAt) colorFirstDataAt = performance.now();
     frames++;
     bytes += Number(message.bytes) || 0;
-    const elapsed = Math.max(0.1, (performance.now() - colorStartedAt) / 1000);
+    const elapsed = Math.max(0.1, (performance.now() - colorFirstDataAt) / 1000);
     colorPanel.querySelector("#color-state")!.textContent = "正在接收";
     colorPanel.querySelector("#color-frames")!.textContent = String(frames);
     colorPanel.querySelector("#color-bytes")!.textContent = `${(bytes / 1024).toFixed(1)} KB`;
@@ -122,6 +139,12 @@ window.addEventListener("message", (event) => {
     setTimeout(() => pulse.classList.remove("active"), 650);
     pulseIndex++;
     progress.style.display = "block";
+  } else if (message.type === "pipeline-stats") {
+    colorPanel.querySelector("#color-pipeline-capture")!.textContent = `${Number(message.captured) || 0} / ${Number(message.submitted) || 0}`;
+    colorPanel.querySelector("#color-pipeline-decoded")!.textContent = String(Number(message.decoded) || 0);
+    colorPanel.querySelector("#color-pipeline-nodata")!.textContent = String(Number(message.noData) || 0);
+    colorPanel.querySelector("#color-pipeline-rejected")!.textContent = String(Number(message.rejected) || 0);
+    colorPanel.querySelector("#color-pipeline-errors")!.textContent = String(Number(message.errors) || 0);
   } else if (message.type === "progress") {
     const values = Array.isArray(message.values) ? message.values.map(Number) : [];
     const activeValues = values.filter((value: number) => value > 0);
@@ -133,7 +156,7 @@ window.addEventListener("message", (event) => {
   } else if (message.type === "complete") {
     if (colorDone) return;
     colorDone = true;
-    const elapsed = Math.max(0.1, (performance.now() - colorStartedAt) / 1000);
+    const elapsed = Math.max(0.1, (performance.now() - (colorFirstDataAt || colorStartedAt)) / 1000);
     const fileBytes = message.file instanceof ArrayBuffer ? new Uint8Array(message.file) : new Uint8Array();
     const finalBytes = fileBytes.length || Number(message.bytes) || bytes;
     const fileName = String(message.name || "received-file.bin");

@@ -20,7 +20,7 @@
     <div id="errorbox"></div><div id="t0"></div><div id="t1"></div><div id="t2"></div><div id="t3"></div>
     <div id="framesInFlight"></div><div id="tdec"></div><div id="progress_bars"><div class="progress"></div></div>
   </div>
-  <script src="recv.2026-07-13T0523.js"></script>
+  <script src="recv.2026-07-13T0523.js?v=2"></script>
   <script src="zstd.2026-07-13T0523.js"></script>
   <script>
     Recv.init_ww(4);
@@ -36,7 +36,10 @@
         parent.postMessage({source:'qrrec-color',type:'runtime-error',phase:'wasm',reason:String(reason)}, location.origin);
       }
     };
-    video.addEventListener('playing',()=>parent.postMessage({source:'qrrec-color',type:'camera-ready',width:video.videoWidth,height:video.videoHeight},location.origin));
+    video.addEventListener('playing',()=>{
+      const settings=video.srcObject?.getVideoTracks?.()[0]?.getSettings?.()||{};
+      parent.postMessage({source:'qrrec-color',type:'camera-ready',width:video.videoWidth,height:video.videoHeight,frameRate:settings.frameRate||0},location.origin);
+    });
     window.addEventListener('error',event=>parent.postMessage({
       source:'qrrec-color',
       type:'runtime-error',

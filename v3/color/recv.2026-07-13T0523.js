@@ -118,6 +118,30 @@ var Recv = function () {
 
   var _mode = 0;
   var _done = false;
+  var _capturedFrames = 0;
+  var _submittedFrames = 0;
+  var _decodedFrames = 0;
+  var _noDataFrames = 0;
+  var _rejectedFrames = 0;
+  var _errorFrames = 0;
+  var _lastPipelineReport = 0;
+
+  function reportPipeline(force) {
+    const now = performance.now();
+    if (!force && now - _lastPipelineReport < 250) return;
+    _lastPipelineReport = now;
+    parent.postMessage({
+      source: 'qrrec-color',
+      type: 'pipeline-stats',
+      captured: _capturedFrames,
+      submitted: _submittedFrames,
+      decoded: _decodedFrames,
+      noData: _noDataFrames,
+      rejected: _rejectedFrames,
+      errors: _errorFrames,
+      inFlight: _framesInFlight
+    }, location.origin);
+  }
 
   function _toggleFullscreen() {
     if (document.fullscreenElement) {
@@ -208,7 +232,7 @@ var Recv = function () {
     },
 
     frames_in_flight_decr: function () {
-      _framesInFlight -= 1;
+      _framesInFlight = Math.max(0, _framesInFlight - 1);
       document.getElementById('framesInFlight').innerHTML = _framesInFlight;
     },
 
@@ -224,12 +248,24 @@ var Recv = function () {
 
         _workers[i].onerror = (error) => {
           console.error('Worker' + i + ' error:', error);
+          Recv.frames_in_flight_decr();
+          _errorFrames += 1;
+          reportPipeline(true);
         };
       }
     },
 
     init_video: function (video) {
       _done = false;
+      if (_counter === 0) {
+        _capturedFrames = 0;
+        _submittedFrames = 0;
+        _decodedFrames = 0;
+        _noDataFrames = 0;
+        _rejectedFrames = 0;
+        _errorFrames = 0;
+        _lastPipelineReport = 0;
+      }
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
 
@@ -242,7 +278,7 @@ var Recv = function () {
           facingMode: 'environment',
           exposureMode: 'continuous',
           focusMode: 'continuous',
-          frameRate: { ideal: 15 }, // we're not trying to set the user's phone on fire
+          frameRate: { ideal: 10 }, // 10 FPS currently gives the best verified browser receive throughput
         }
       };
 
@@ -322,12 +358,18 @@ var Recv = function () {
       // if extract but no bytes, log extract counte
       if (data.nodata) {
         _recentExtract = _counter;
+        _noDataFrames += 1;
+        reportPipeline();
         return;
       }
       if (data.failed_extract) { // very common, nothing to do
+        _rejectedFrames += 1;
+        reportPipeline();
         return;
       }
       if (data.res) {
+        _errorFrames += 1;
+        reportPipeline();
         Recv.set_HTML("t" + wid, "msg is " + data.res);
         return;
       }
@@ -336,23 +378,29 @@ var Recv = function () {
 
       const buff = data.buff;
       if (!buff) {
-        if (data.error)
+        if (data.error) {
+          _errorFrames += 1;
+          reportPipeline();
           Recv.set_HTML("t" + wid, "worker returned no frame data");
+        }
         return;
       }
       if (buff.length > 0) {
+        _decodedFrames += 1;
+        reportPipeline(true);
         Recv.setMode(data.mode); // call *before* we send it to the sink. This is our autodetect confirm.
       }
       Recv.set_HTML("t" + wid, "mode is " + _mode + ", len() is " + buff.length + ", buff: " + buff);
       Sink.on_decode(buff);
     },
 
-    on_frame: function (now, metadata) {
+    on_frame: async function (now, metadata) {
       //console.log("on frame");
       // https://developer.mozilla.org/en-US/docs/Web/API/VideoFrame
 
       if (_done) return;
       _counter += 1;
+      _capturedFrames += 1;
       if (_workers.length == 0)
         return;
       if (_nextWorker >= _workers.length)
@@ -371,6 +419,7 @@ var Recv = function () {
       }
       else {
         Recv.frames_in_flight_incr();
+        let submitted = false;
         try {
           vf = new VideoFrame(_video, { timestamp: now });
           const width = vf.displayWidth;
@@ -384,7 +433,13 @@ var Recv = function () {
           }
           const size = vf.allocationSize(vfparams);
           const buff = new Uint8Array(size);
-          vf.copyTo(buff, vfparams);
+          await vf.copyTo(buff, vfparams);
+
+          if (_done) {
+            vf.close();
+            Recv.frames_in_flight_decr();
+            return;
+          }
 
           let format = vfparams.format || vf.format;
           if (format == "RGBA" && size != width * height * 4) {
@@ -397,8 +452,16 @@ var Recv = function () {
 
           let mode = _mode || modeVals[_counter % modeVals.length];
           _workers[_nextWorker].postMessage({ type: 'proc', pixels: buff, format: format, width: width, height: height, mode: mode }, [buff.buffer]);
+          submitted = true;
+          _submittedFrames += 1;
+          reportPipeline();
         } catch (e) {
           console.log(e);
+          _errorFrames += 1;
+          reportPipeline(true);
+        } finally {
+          if (!submitted)
+            Recv.frames_in_flight_decr();
         }
         _nextWorker += 1;
       }
