@@ -26,8 +26,13 @@
     Recv.init_ww(4);
     const video = document.querySelector('#video');
     let runtimeReady = false;
+    const startupTimer = setTimeout(() => parent.postMessage({
+      source:'qrrec-color', type:'runtime-error', phase:'startup',
+      reason:'libcimbar 初始化超过 12 秒，请重新打开 App'
+    }, location.origin), 12000);
     var Module = {
       onRuntimeInitialized() {
+        clearTimeout(startupTimer);
         runtimeReady = true;
         parent.postMessage({source:'qrrec-color',type:'runtime-ready'}, location.origin);
         Recv.init_video(video);
@@ -45,6 +50,9 @@
       type:'runtime-error',
       phase:runtimeReady?'decode':'startup',
       reason:event.message
+    },location.origin));
+    window.addEventListener('unhandledrejection',event=>parent.postMessage({
+      source:'qrrec-color',type:'runtime-error',phase:runtimeReady?'decode':'startup',reason:String(event.reason)
     },location.origin));
   </script>
   <script src="cimbar_js.2026-07-13T0523.js"></script>

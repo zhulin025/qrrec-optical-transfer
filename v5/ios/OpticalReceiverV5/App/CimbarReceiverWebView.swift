@@ -23,6 +23,8 @@ struct CimbarReceiverWebView: UIViewRepresentable {
             if (e.data && e.data.source === 'qrrec-color')
               window.webkit.messageHandlers.nativeStatus.postMessage(e.data);
           });
+          window.addEventListener('unhandledrejection', e =>
+            window.webkit.messageHandlers.nativeStatus.postMessage({type:'runtime-error', reason:String(e.reason)}));
         """, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         let config = WKWebViewConfiguration()
         config.userContentController = controller
@@ -36,11 +38,21 @@ struct CimbarReceiverWebView: UIViewRepresentable {
         web.uiDelegate = context.coordinator
         web.navigationDelegate = context.coordinator
         context.coordinator.webView = web
-        if let page = Bundle.main.url(forResource: "runtime-recv", withExtension: "html", subdirectory: "Web") {
-            web.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
-        } else {
+        guard let server = LocalWebServer() else {
             model.status = "找不到内置 libcimbar 运行时"
             model.hasError = true
+            return web
+        }
+        context.coordinator.server = server
+        server.start { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let page): web.load(URLRequest(url: page))
+                case .failure(let error):
+                    model.status = error.localizedDescription
+                    model.hasError = true
+                }
+            }
         }
         return web
     }
@@ -52,6 +64,7 @@ struct CimbarReceiverWebView: UIViewRepresentable {
         var downloadedFile: Binding<URL?>
         weak var webView: WKWebView?
         var pendingDownloadURL: URL?
+        var server: LocalWebServer?
 
         init(model: ReceiverModel, downloadedFile: Binding<URL?>) {
             self.model = model; self.downloadedFile = downloadedFile
@@ -70,6 +83,20 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                 default: break
                 }
             }
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            model.status = "页面已加载，正在初始化 libcimbar…"
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            model.hasError = true
+            model.status = "解码页面加载失败：\(error.localizedDescription)"
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            model.hasError = true
+            model.status = "本地服务连接失败：\(error.localizedDescription)"
         }
 
         func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
