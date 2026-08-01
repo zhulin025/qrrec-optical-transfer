@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>高速光码接收器 V2</title>
+    <meta name="theme-color" content="#090b10" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-512.png" />
+    <link rel="stylesheet" href="../../shared/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="eyebrow">QRREC V2 · DUAL QR RECEIVER</div>
+      <h1>高速光码接收器 V2</h1>
+      <p>稳定帧过滤、双 ROI 并行解码与自动解压缩。</p>
+    </header>
+    <div class="hint status-pill" id="stats">准备接收光码</div>
+    <section class="capabilities" aria-label="运行能力">
+      <div id="cap-secure"><span></span><small>安全环境</small><b>检测中</b></div>
+      <div id="cap-camera"><span></span><small>摄像头</small><b>待启动</b></div>
+      <div id="cap-worker"><span></span><small>Worker</small><b>待启动</b></div>
+      <div id="cap-wasm"><span></span><small>WASM</small><b>待启动</b></div>
+    </section>
+    <details class="settings" id="settings">
+      <summary>摄像头设置</summary>
+      <div class="row">
+        <label class="camera-label">
+          摄像头
+          <select id="cfg-camera">
+            <option value="">自动选择后置摄像头</option>
+          </select>
+        </label>
+        <label>
+          采集宽度
+          <select id="cfg-width">
+            <option>960</option>
+            <option selected>1280</option>
+            <option>1920</option>
+          </select>
+        </label>
+        <label>
+          采集帧率
+          <select id="cfg-capfps">
+            <option>30</option>
+            <option selected>60</option>
+          </select>
+        </label>
+        <label>
+          解码线程
+          <select id="cfg-workers">
+            <option>1</option>
+            <option selected>2</option>
+            <option>3</option>
+          </select>
+        </label>
+      </div>
+      <div class="hint left">
+        默认设置适合大多数手机。若识别困难，请保持设备稳定并调高发送端亮度。
+      </div>
+    </details>
+    <button id="start">开启摄像头接收</button>
+    <p class="hint">首次使用会申请摄像头权限。四项全部通过后即可接收动态光码。</p>
+    <div class="metrics" id="metrics" style="display: none">
+      <div class="metric"><div class="k">采集帧率</div><div class="v" id="m-cap">—</div></div>
+      <div class="metric"><div class="k">解码帧率</div><div class="v amber" id="m-dec">—</div></div>
+      <div class="metric"><div class="k">接收速度</div><div class="v amber" id="m-rate">—</div></div>
+      <div class="metric"><div class="k">已用时间</div><div class="v" id="m-time">—</div></div>
+      <div class="metric"><div class="k">新帧/重复</div><div class="v" id="m-frames">—</div></div>
+      <div class="metric"><div class="k">源数据块</div><div class="v" id="m-k">—</div></div>
+      <div class="metric"><div class="k">单块大小</div><div class="v" id="m-block">—</div></div>
+      <div class="metric"><div class="k">文件数据</div><div class="v" id="m-payload">—</div></div>
+      <div class="metric"><div class="k">稳定帧/过滤</div><div class="v" id="m-stable">—</div></div>
+      <div class="metric"><div class="k">解码区域</div><div class="v roi-state" id="m-roi">整帧搜索</div></div>
+    </div>
+    <div class="preview" id="preview" style="display: none">
+      <video id="video" muted playsinline></video>
+      <div class="scan-guide"><span></span></div>
+    </div>
+    <section class="transfer-progress" id="progress" style="display: none">
+      <div class="progress-copy">
+        <div><strong>正在接收</strong><span id="progress-frames">0 / 0 帧</span></div>
+        <b id="progress-percent">0%</b>
+      </div>
+      <div class="progress"><div id="bar"></div></div>
+      <div class="frame-pulses" id="frame-pulses" aria-label="最近收到的数据帧"></div>
+    </section>
+    <div id="result"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

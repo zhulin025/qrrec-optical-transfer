@@ -1,0 +1,5 @@
+{
+  "framework": null,
+  "buildCommand": "npm run build:web",
+  "outputDirectory": "release/web-receiver"
+}

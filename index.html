@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Optical Transfer — fountain-coded QR file transfer</title>
+    <link rel="stylesheet" href="./shared/style.css" />
+  </head>
+  <body>
+    <h1>DECIMEN <small>— Fountain QR File Transfer (PoC)</small></h1>
+    <p class="hint">
+      Send a file between two devices using nothing but a screen and a camera.
+      Open <a href="./send/">send</a> on the device with the file (a laptop is
+      ideal) and <a href="./receive/">receive</a> on a phone, then point the
+      phone's camera at the flickering code.
+    </p>
+    <p class="hint">
+      No network path between the devices is used — the payload travels as
+      light. Fountain coding means the receiver can drop any frames, in any
+      order, and still reconstruct the file.
+    </p>
+  </body>
+</html>

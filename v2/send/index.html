@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>光码发送器 V2</title>
+    <meta name="theme-color" content="#090b10" />
+    <link rel="manifest" href="../manifest.webmanifest" />
+    <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="../../shared/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="eyebrow">QRREC V2 · DUAL FOUNTAIN QR</div>
+      <h1>高速光码发送器 V2</h1>
+      <p>双二维码并行、自动压缩与自适应高速参数。文件不会上传网络。</p>
+    </header>
+    <section class="file-card">
+      <input id="file" type="file" />
+      <label for="file" class="file-pick">
+        <span class="file-icon">＋</span>
+        <span><strong>选择要发送的文件</strong><small>支持图片、视频、文档和压缩包</small></span>
+      </label>
+      <div id="file-info" class="file-info">尚未选择文件</div>
+    </section>
+    <div class="hint" id="specs">选择文件后开始生成光码</div>
+    <details class="settings">
+      <summary>传输设置</summary>
+      <div class="row">
+        <label>
+          播放帧率
+          <select id="cfg-fps">
+            <option>10</option>
+            <option>15</option>
+            <option>20</option>
+            <option>24</option>
+            <option selected>30</option>
+            <option>60</option>
+          </select>
+        </label>
+        <label>
+          每帧数据量
+          <select id="cfg-bytes">
+            <option>500</option>
+            <option>1000</option>
+            <option>1465</option>
+            <option>1850</option>
+            <option selected>2331</option>
+            <option>2953</option>
+          </select>
+        </label>
+        <label>
+          光码数量
+          <select id="cfg-codes">
+            <option>1</option>
+            <option selected>2</option>
+          </select>
+        </label>
+        <label>
+          二维码纠错
+          <select id="cfg-ecc">
+            <option selected>L</option>
+            <option>M</option>
+            <option>Q</option>
+            <option>H</option>
+          </select>
+        </label>
+        <label>
+          显示尺寸
+          <input id="cfg-size" type="range" min="300" max="1200" step="50" value="900" />
+        </label>
+      </div>
+      <div class="hint left">修改设置会自动重启当前光码流，接收端会识别新会话。</div>
+    </details>
+    <div class="receiver-link">
+      <span>接收端：</span>
+      <a id="receiver-link" href="../">qrrec.liuwa.xyz</a>
+      <div class="receiver-link-popover" role="tooltip">
+        <canvas id="receiver-link-qr" width="220" height="220"></canvas>
+        <small>扫码打开接收端</small>
+      </div>
+    </div>
+    <div class="stage-wrap">
+      <div class="dual-stage" id="dual-stage">
+        <div class="stage"><canvas id="qr-a" width="16" height="16"></canvas></div>
+        <div class="stage" id="stage-b"><canvas id="qr-b" width="16" height="16"></canvas></div>
+      </div>
+    </div>
+    <div class="hint">
+      请使用 V2 接收器扫描。保持两个二维码完整显示，并将发送屏幕亮度调高。
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
