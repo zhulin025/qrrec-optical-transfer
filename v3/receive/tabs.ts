@@ -21,7 +21,7 @@ colorPanel.innerHTML = `
     <div class="hint status-pill">彩色矩阵接收模式</div>
     <p class="hint">对准 V3 发送端的彩色矩阵，保持画面完整、稳定且无反光。文件仍只在两台设备之间传输。</p>
   </div>
-  <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="../color/recv.html?embed=1"></iframe></div>
+  <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="./color/recv.html?embed=1"></iframe></div>
 `;
 qrPanel.after(colorPanel);
 
