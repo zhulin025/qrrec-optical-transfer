@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090b10" />
+    <title>高速光码发送器 V5</title>
+    <link rel="stylesheet" href="../../shared/style.css" />
+    <style>
+      .v5-badge{display:inline-flex;padding:7px 12px;border:1px solid #29313e;border-radius:999px;color:#62dfa0;background:#10151e;font-size:12px;font-weight:800;letter-spacing:.08em}
+      .color-runtime{width:min(920px,calc(100vw - 32px));height:min(72vh,820px);border:12px solid #fff;border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+      .color-runtime iframe{display:block;width:100%;height:100%;border:0;background:#fff}
+      #runtime-wrap[hidden]{display:none}
+      .native-note{width:min(92vw,640px);padding:12px 14px;border:1px solid rgba(98,223,160,.24);border-radius:14px;color:#aab3c3;background:rgba(98,223,160,.06);font-size:13px;text-align:center}
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="eyebrow">QRREC V5 · LIBCIMBAR OPTICAL SENDER</div>
+      <h1>高速光码发送器 V5</h1>
+      <p>基于 libcimbar 的彩色符号、Reed–Solomon 纠错与喷泉码传输。文件始终留在本机。</p>
+    </header>
+    <div class="v5-badge">CIMBAR · 6 BIT COLOR MATRIX</div>
+    <section class="file-card">
+      <input id="file" type="file" />
+      <label for="file" class="file-pick">
+        <span class="file-icon">＋</span>
+        <span><strong>选择要发送的文件</strong><small>支持图片、视频、文档和压缩包</small></span>
+      </label>
+      <div id="file-info" class="file-info">尚未选择文件</div>
+    </section>
+    <div class="hint" id="specs">选择文件后开始生成彩色光码</div>
+    <details class="settings">
+      <summary>传输设置</summary>
+      <div class="row">
+        <label>播放帧率<select id="fps"><option>5</option><option>10</option><option selected>15</option><option>20</option></select></label>
+        <label>矩阵模式<select id="mode"><option value="B" selected>标准 B</option><option value="Bm">均衡 Bm</option><option value="Bu">稳健 Bu</option><option value="4C">四色 4C</option></select></label>
+      </div>
+      <div class="hint left">标准模式容量最高；拍摄距离较远或屏幕有摩尔纹时，改用均衡或稳健模式。</div>
+    </details>
+    <div class="native-note"><strong>接收端：请使用 QRREC V5 iOS App</strong><br />保持矩阵完整显示，并将发送屏幕亮度调高。</div>
+    <div id="runtime-wrap" class="stage-wrap" hidden>
+      <div class="stage color-runtime"><iframe id="runtime" title="V5 彩色矩阵发送画面" src="./runtime-send.html?v=5"></iframe></div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

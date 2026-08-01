@@ -1,0 +1,108 @@
+import SwiftUI
+import WebKit
+
+@MainActor
+final class ReceiverModel: ObservableObject {
+    @Published var status = "正在启动本地解码器…"
+    @Published var cameraReady = false
+    @Published var decoderReady = false
+    @Published var hasError = false
+}
+
+struct CimbarReceiverWebView: UIViewRepresentable {
+    @ObservedObject var model: ReceiverModel
+    @Binding var downloadedFile: URL?
+
+    func makeCoordinator() -> Coordinator { Coordinator(model: model, downloadedFile: $downloadedFile) }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let controller = WKUserContentController()
+        controller.add(context.coordinator, name: "nativeStatus")
+        controller.addUserScript(WKUserScript(source: """
+          window.addEventListener('message', e => {
+            if (e.data && e.data.source === 'qrrec-color')
+              window.webkit.messageHandlers.nativeStatus.postMessage(e.data);
+          });
+        """, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        let config = WKWebViewConfiguration()
+        config.userContentController = controller
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        config.preferences.isElementFullscreenEnabled = true
+        let web = WKWebView(frame: .zero, configuration: config)
+        web.isOpaque = false
+        web.backgroundColor = .black
+        web.scrollView.isScrollEnabled = false
+        web.uiDelegate = context.coordinator
+        web.navigationDelegate = context.coordinator
+        context.coordinator.webView = web
+        if let page = Bundle.main.url(forResource: "runtime-recv", withExtension: "html", subdirectory: "Web") {
+            web.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
+        } else {
+            model.status = "找不到内置 libcimbar 运行时"
+            model.hasError = true
+        }
+        return web
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate {
+        let model: ReceiverModel
+        var downloadedFile: Binding<URL?>
+        weak var webView: WKWebView?
+        var pendingDownloadURL: URL?
+
+        init(model: ReceiverModel, downloadedFile: Binding<URL?>) {
+            self.model = model; self.downloadedFile = downloadedFile
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let info = message.body as? [String: Any], let type = info["type"] as? String else { return }
+            Task { @MainActor in
+                switch type {
+                case "runtime-ready": self.model.decoderReady = true; self.model.status = "解码器已就绪，正在申请后置相机"
+                case "camera-ready":
+                    self.model.cameraReady = true
+                    let w = info["width"] as? Int ?? 0, h = info["height"] as? Int ?? 0
+                    self.model.status = "相机 \(w)×\(h) · 等待彩色光码"
+                case "runtime-error": self.model.hasError = true; self.model.status = "解码失败：\(info["reason"] ?? "未知错误")"
+                default: break
+                }
+            }
+        }
+
+        func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+                     initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
+                     decisionHandler: @escaping @MainActor @Sendable (WKPermissionDecision) -> Void) { decisionHandler(.grant) }
+
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+                     preferences: WKWebpagePreferences, decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+            if action.shouldPerformDownload { decisionHandler(.download, preferences) }
+            else { decisionHandler(.allow, preferences) }
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) { download.delegate = self }
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) { download.delegate = self }
+
+        func download(_ download: WKDownload, decideDestinationUsing response: URLResponse,
+                      suggestedFilename: String) async -> URL? {
+            let clean = suggestedFilename.replacingOccurrences(of: "/", with: "_")
+            let destination = FileManager.default.temporaryDirectory.appendingPathComponent(clean)
+            try? FileManager.default.removeItem(at: destination)
+            pendingDownloadURL = destination
+            return destination
+        }
+
+        func downloadDidFinish(_ download: WKDownload) {
+            Task { @MainActor in
+                self.model.status = "文件接收完成"
+                self.downloadedFile.wrappedValue = self.pendingDownloadURL
+            }
+        }
+
+        func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+            Task { @MainActor in self.model.hasError = true; self.model.status = "文件保存失败：\(error.localizedDescription)" }
+        }
+    }
+}

@@ -19,7 +19,7 @@ export default defineConfig({
           .replace(/\s*<link rel="manifest"[^>]*>/, "")
           .replace(/\s*<link rel="icon"[^>]*>/, "")
           .replace("<body>", '<body class="xhs-tool">')
-          .replace('id="receiver-link" href="../"', 'id="receiver-link" href="#"');
+          .replace('id="receiver-link" href="https://qrrec.liuwa.xyz/"', 'id="receiver-link" href="#"');
       },
     },
     {

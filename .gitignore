@@ -5,3 +5,5 @@ xhs-receiver-probe/
 *.local
 .DS_Store
 .vercel
+xcuserdata/
+*.xcuserstate

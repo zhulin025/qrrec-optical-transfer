@@ -29,7 +29,7 @@ const formatBytes = (bytes: number) => bytes < 1024
   : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 
 async function main() {
-  const receiverUrl = new URL("../", window.location.href).href;
+  const receiverUrl = "https://qrrec.liuwa.xyz/v2/";
   receiverLink.href = receiverUrl;
   receiverLink.textContent = new URL(receiverUrl).host + new URL(receiverUrl).pathname.replace(/\/$/, "");
   await QRCode.toCanvas(receiverLinkQr, receiverUrl, { width: 220, margin: 3, errorCorrectionLevel: "M" });

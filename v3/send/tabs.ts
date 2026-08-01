@@ -31,7 +31,7 @@ colorPanel.innerHTML = `
     </div>
     <div class="hint left">默认设置适合大多数屏幕。识别困难时可降低播放帧率或选择稳健模式。</div>
   </details>
-  <div class="receiver-link"><span>接收端：</span><a href="../">qrrec.liuwa.xyz/v3</a></div>
+  <div class="receiver-link"><span>接收端：</span><a href="https://qrrec.liuwa.xyz/v3/">qrrec.liuwa.xyz/v3</a></div>
   <div class="stage-wrap" id="color-stage-wrap" style="display:none"><div class="stage color-runtime"><iframe title="彩色矩阵发送画面" data-src="../color/runtime-send.html?v=3"></iframe></div></div>
   <p class="hint">请使用 V3 接收器的“彩色矩阵”模式扫描。保持矩阵完整显示，并将发送屏幕亮度调高。</p>
 `;
