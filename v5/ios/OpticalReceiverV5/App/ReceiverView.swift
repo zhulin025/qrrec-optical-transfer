@@ -40,10 +40,10 @@ struct ReceiverView: View {
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
                     metric("采集", String(format: "%.1f FPS", model.captureFPS))
-                    metric("提交", String(format: "%.1f FPS", model.submitFPS))
+                    metric("处理区域", roiText())
                     metric("解码", String(format: "%.2f FPS", model.decodeFPS), good: model.decodeFPS > 0)
                     metric("处理中", "\(model.inFlight)")
-                    metric("采集帧", "\(model.captured)")
+                    metric("丢弃旧帧", "\(model.dropped)")
                     metric("接收速率", rateText(model.transferRate), good: model.transferRate > 0)
                     metric("成功帧", "\(model.decoded)", good: model.decoded > 0)
                     metric("已收数据", byteText(model.decodedBytes), good: model.decodedBytes > 0)
@@ -80,7 +80,9 @@ struct ReceiverView: View {
                     if hasSession {
                         CimbarReceiverWebView(model: model, downloadedFile: $shareURL)
                             .id(sessionID)
-                        if model.isRunning { ScanCorners().padding(34).allowsHitTesting(false) }
+                        if model.isRunning {
+                            ScanCorners().aspectRatio(1, contentMode: .fit).padding(34).allowsHitTesting(false)
+                        }
                     } else {
                         VStack(spacing: 12) {
                             Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(.secondary)
@@ -94,7 +96,7 @@ struct ReceiverView: View {
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
                 .shadow(color: .black.opacity(0.45), radius: 28, y: 14)
 
-                Text("将彩色矩阵完整放入取景框。文件接收完成后会先在 App 内预览，再由你选择保存或下载。")
+                Text("将彩色矩阵完整放入中央正方形取景框。当前 \(model.cameraProfile)模式 · \(model.pixelFormat)。接收完成后可预览并保存。")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -128,6 +130,11 @@ struct ReceiverView: View {
         if bytesPerSecond >= 1_048_576 { return String(format: "%.1f MB/s", bytesPerSecond / 1_048_576) }
         if bytesPerSecond >= 1_024 { return String(format: "%.1f KB/s", bytesPerSecond / 1_024) }
         return String(format: "%.0f B/s", bytesPerSecond)
+    }
+
+    private func roiText() -> String {
+        guard model.roiWidth > 0 else { return "--" }
+        return model.roiWidth == model.roiHeight ? "\(model.roiWidth)²" : "\(model.roiWidth)×\(model.roiHeight)"
     }
 
     private func capability(_ title: String, _ ready: Bool) -> some View {

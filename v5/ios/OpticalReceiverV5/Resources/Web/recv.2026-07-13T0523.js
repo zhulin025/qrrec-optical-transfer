@@ -133,6 +133,14 @@ var Recv = function () {
   var _captureFps = 0;
   var _submitFps = 0;
   var _decodeFps = 0;
+  var _droppedFrames = 0;
+  var _roiWidth = 0;
+  var _roiHeight = 0;
+  var _pixelFormat = "unknown";
+  var _cameraTrack = undefined;
+  var _cameraProfile = "清晰";
+  var _profileChanges = 0;
+  var _lastAdaptation = performance.now();
 
   function reportPipeline(force) {
     const now = performance.now();
@@ -159,8 +167,36 @@ var Recv = function () {
       inFlight: _framesInFlight,
       captureFps: _captureFps,
       submitFps: _submitFps,
-      decodeFps: _decodeFps
+      decodeFps: _decodeFps,
+      dropped: _droppedFrames,
+      roiWidth: _roiWidth,
+      roiHeight: _roiHeight,
+      pixelFormat: _pixelFormat,
+      cameraProfile: _cameraProfile
     }, location.origin);
+  }
+
+  async function adaptCameraProfile() {
+    const now = performance.now();
+    if (!_cameraTrack || _profileChanges >= 2 || now - _lastAdaptation < 6000 || _capturedFrames < 25) return;
+    _lastAdaptation = now;
+    const attempts = Math.max(1, _decodedFrames + _noDataFrames + _rejectedFrames);
+    const locatedRatio = (_decodedFrames + _noDataFrames) / attempts;
+    try {
+      if (_cameraProfile === "清晰" && _captureFps < 10.5 && locatedRatio > 0.08) {
+        await _cameraTrack.applyConstraints({ width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 } });
+        _cameraProfile = "性能";
+        _profileChanges += 1;
+        reportPipeline(true);
+      } else if (_cameraProfile === "性能" && _decodedFrames === 0 && _rejectedFrames > 30) {
+        await _cameraTrack.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 15 } });
+        _cameraProfile = "清晰";
+        _profileChanges += 1;
+        reportPipeline(true);
+      }
+    } catch (error) {
+      console.log("camera profile adaptation unavailable", error);
+    }
   }
 
   function _toggleFullscreen() {
@@ -289,6 +325,8 @@ var Recv = function () {
         _lastRateAt = _pipelineStartedAt;
         _lastRateCaptured = 0; _lastRateSubmitted = 0; _lastRateDecoded = 0;
         _captureFps = 0; _submitFps = 0; _decodeFps = 0;
+        _droppedFrames = 0; _roiWidth = 0; _roiHeight = 0; _pixelFormat = "unknown";
+        _cameraProfile = "清晰"; _profileChanges = 0; _lastAdaptation = performance.now();
       }
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
@@ -312,6 +350,7 @@ var Recv = function () {
 
       navigator.mediaDevices.getUserMedia(constraints)
         .then(localMediaStream => {
+          _cameraTrack = localMediaStream.getVideoTracks()[0];
           //console.log(localMediaStream);
           //console.dir(video);
           if ('srcObject' in video) {
@@ -474,12 +513,14 @@ var Recv = function () {
       Recv.update_visual_state();
       // make sure the camera feed stays up
       Recv.watch_for_camera_pause();
+      adaptCameraProfile();
 
       const modeVals = [66, 68, 67, 4];
 
       var vf = undefined;
-      if (_framesInFlight > 20) {
-        console.log("stalling, worker queues are full");
+      if (_framesInFlight >= _workers.length) {
+        _droppedFrames += 1;
+        reportPipeline();
       }
       else {
         Recv.frames_in_flight_incr();
@@ -488,6 +529,7 @@ var Recv = function () {
           vf = new VideoFrame(_video, { timestamp: now });
           const width = vf.displayWidth;
           const height = vf.displayHeight;
+          _pixelFormat = vf.format || "unknown";
           Recv.set_HTML("errorbox", vf.format, true);
 
           // try to use the default format, but only if we can decode it...
@@ -495,9 +537,33 @@ var Recv = function () {
           if (!_supportedFormats.includes(vf.format)) {
             vfparams.format = "RGBA";
           }
-          const size = vf.allocationSize(vfparams);
-          const buff = new Uint8Array(size);
-          await vf.copyTo(buff, vfparams);
+          let processWidth = width;
+          let processHeight = height;
+          const side = Math.floor(Math.min(width, height) / 2) * 2;
+          if (side >= 700 && width !== height) {
+            const cropX = Math.floor((width - side) / 4) * 2;
+            const cropY = Math.floor((height - side) / 4) * 2;
+            vfparams.rect = { x: cropX, y: cropY, width: side, height: side };
+            processWidth = side;
+            processHeight = side;
+          }
+          let size;
+          let buff;
+          try {
+            size = vf.allocationSize(vfparams);
+            buff = new Uint8Array(size);
+            await vf.copyTo(buff, vfparams);
+          } catch (cropError) {
+            console.log("ROI copy unavailable, falling back to full frame", cropError);
+            delete vfparams.rect;
+            processWidth = width;
+            processHeight = height;
+            size = vf.allocationSize(vfparams);
+            buff = new Uint8Array(size);
+            await vf.copyTo(buff, vfparams);
+          }
+          _roiWidth = processWidth;
+          _roiHeight = processHeight;
 
           if (_done) {
             vf.close();
@@ -506,16 +572,16 @@ var Recv = function () {
           }
 
           let format = vfparams.format || vf.format;
-          if (format == "RGBA" && size != width * height * 4) {
+          if (format == "RGBA" && size != processWidth * processHeight * 4) {
             format = vf.format; //fallback
           }
           if (_captureNextFrame == 1) {
             _captureNextFrame = 0;
-            Recv.download_bytes(buff, width + "x" + height + "x" + _counter + "." + format);
+            Recv.download_bytes(buff, processWidth + "x" + processHeight + "x" + _counter + "." + format);
           }
 
           let mode = _mode || modeVals[_counter % modeVals.length];
-          _workers[_nextWorker].postMessage({ type: 'proc', pixels: buff, format: format, width: width, height: height, mode: mode }, [buff.buffer]);
+          _workers[_nextWorker].postMessage({ type: 'proc', pixels: buff, format: format, width: processWidth, height: processHeight, mode: mode }, [buff.buffer]);
           submitted = true;
           _submittedFrames += 1;
           reportPipeline();
@@ -548,6 +614,7 @@ var Recv = function () {
         stream.getTracks().forEach(track => track.stop());
       if (_video)
         _video.srcObject = null;
+      _cameraTrack = undefined;
     },
 
     captureFrame: function () {
