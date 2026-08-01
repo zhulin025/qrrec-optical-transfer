@@ -1,8 +1,8 @@
 # QRREC 光学文件传输
 
-QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发送端把文件编码成连续播放的二维码或彩色矩阵，接收端采集有效画面、重组并校验文件。V1–V4 在浏览器本地运行，V5 使用网页发送端和 iOS App 接收端；文件内容都不会上传服务器。
+QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发送端把文件编码成连续播放的二维码或彩色矩阵，接收端采集有效画面、重组并校验文件。V1–V4 在浏览器本地运行，V5/V5.1 使用网页发送端和 iOS App 接收端；文件内容都不会上传服务器。
 
-## 五个版本概览
+## 版本概览
 
 | 版本 | 核心定位 | 主要特点 | 适合场景 | 在线入口 |
 | --- | --- | --- | --- | --- |
@@ -11,6 +11,7 @@ QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发�
 | **V3 多通道实验版** | 继续优化实时接收，并探索彩色高密度编码 | 高速双 QR、画面指纹去重、重叠 ROI 并行搜索；另带 libcimbar 彩色矩阵通道、实时速率/进度/解码统计、完成后媒体预览 | 测试高性能实时传输，或比较双 QR 与彩色矩阵效果 | [接收端](https://qrrec.liuwa.xyz/v3/) · [发送端](https://qrrec.liuwa.xyz/v3/send/) |
 | **V4 先录像后解码版** | 把摄像头采集和 QR 解码分成两个阶段 | 发送端生成有限且可验证的循环并给出建议录像时长；接收端先录像或导入已有视频，停止拍摄后再以 30 FPS 本地离线解码，重组成功即可提前结束 | 手机实时解码跟不上、需要先稳定录下画面再慢慢处理 | [接收端](https://qrrec.liuwa.xyz/v4/) · [发送端](https://qrrec.liuwa.xyz/v4/send/) |
 | **V5 libcimbar iOS 版** | 用原生 App 提高彩色矩阵接收稳定性 | 网页端使用 libcimbar 彩色符号、Reed–Solomon、交织和 Wirehair 喷泉码；iOS App 提供相机权限管理、屏幕常亮、4 路 WASM 解码、沙盒保存和系统分享 | 使用 iPhone 接收彩色高密度光码，希望减少普通移动网页的生命周期与权限限制 | 发送端本地运行 · 接收端使用 QRREC V5 iOS App |
+| **V5.1 原生 C++ 版** | 去掉 WebView/WASM 接收瓶颈 | AVFoundation 直接采集 1080p NV12，原生 C++ libcimbar/OpenCV 解码；独立解码队列、实时性能指标、App 内结果与手动保存 | 在真机上继续提高 libcimbar 吞吐量并观察原生解码性能 | 与 V5 共用网页发送端 · 接收端使用 QRREC V5.1 iOS App |
 
 ### 怎么选择
 
@@ -19,6 +20,7 @@ QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发�
 - 想查看更多实时指标，或测试彩色矩阵：选择 **V3**。
 - 实时解码容易掉帧，但手机录像清晰：选择 **V4**。
 - 使用 iPhone，并希望用 App 接收 libcimbar 彩色矩阵：选择 **V5**。
+- 希望测试真正的 AVFoundation + C++ 原生接收链路：选择 **V5.1**。
 
 > 不同版本和不同通道的封装或协议可能不兼容，请始终使用同一版本、同一模式的发送端和接收端。
 
@@ -103,6 +105,10 @@ V5 保留 V3 的暗色视觉语言，但只保留 libcimbar 彩色矩阵通道�
 
 工程和真机运行说明见 [`v5/README.md`](v5/README.md)。
 
+### V5.1：AVFoundation + C++ 原生接收端
+
+V5.1 保留 V5 的发送码流和界面风格，但建立独立 iOS 工程。相机通过 AVFoundation 直接输出 NV12，帧数据进入本地编译的 libcimbar/OpenCV C++ 解码器，不再经过 WKWebView、Canvas、JavaScript 或 WASM。文件完成后先显示在 App 内，由用户点击保存。构建依赖和使用方法见 [`v5.1/README.md`](v5.1/README.md)。
+
 ## 为什么使用喷泉码
 
 单向光学链路没有实用的重传通道。自动对焦、设备移动、屏幕刷新边界和解码器负载都可能导致帧丢失。
@@ -145,6 +151,8 @@ npm run build:sender:v5
 ```
 
 iOS 接收端使用 Xcode 打开 [`v5/ios/OpticalReceiverV5/OpticalReceiverV5.xcodeproj`](v5/ios/OpticalReceiverV5/OpticalReceiverV5.xcodeproj)，配置 Development Team 后安装到真实 iPhone。模拟器可用于编译和界面检查，但不能完成真实相机传输验证。
+
+V5.1 首次构建先运行 `v5.1/scripts/prepare_native_ios.sh`，再打开 [`v5.1/ios/OpticalReceiverV51/OpticalReceiverV51.xcodeproj`](v5.1/ios/OpticalReceiverV51/OpticalReceiverV51.xcodeproj)。V5.1 当前仅支持 iPhone arm64 真机。
 
 静态文件会生成到 `release/web-receiver`，主要路由如下：
 

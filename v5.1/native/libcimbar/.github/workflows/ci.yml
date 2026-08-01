@@ -1,0 +1,68 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        config:
+        - name: "linux gcc11"
+          os: ubuntu-22.04
+          env: CXX="g++-11" CC="gcc-11"
+
+        - name: "linux gcc-latest"
+          os: ubuntu-latest
+
+        - name: "linux clang14"
+          os: ubuntu-22.04
+          env: CXX="clang++" CC="clang"
+          extra-packages: "clang"
+
+        - name: "linux clang-latest"
+          os: ubuntu-latest
+          env: CXX="clang++" CC="clang"
+          extra-packages: "clang"
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install libopencv-dev libglfw3-dev libgles2-mesa-dev ${{ matrix.config.extra-packages }}
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{runner.workspace}}/build
+
+    - name: Configure CMake
+      working-directory: ${{runner.workspace}}/build
+      run: ${{ matrix.config.env }} cmake $GITHUB_WORKSPACE
+
+    - name: Build
+      working-directory: ${{runner.workspace}}/build
+      run: cmake --build . && cmake --install .
+
+    - name: Test
+      working-directory: ${{runner.workspace}}/build
+      run: ctest --output-on-failure
+
+    - name: Usage test
+      working-directory: ${{runner.workspace}}/libcimbar/test/py
+      run: python3 -m unittest
+
+  cppcheck:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get install cppcheck
+
+    - name: run cppcheck
+      run: cppcheck src/
+

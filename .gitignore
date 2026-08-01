@@ -7,3 +7,5 @@ xhs-receiver-probe/
 .vercel
 xcuserdata/
 *.xcuserstate
+v5.1/ios/OpticalReceiverV51/Dependencies/
+v5.1/native/build/
