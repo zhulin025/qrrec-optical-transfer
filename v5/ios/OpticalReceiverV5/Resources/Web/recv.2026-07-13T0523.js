@@ -87,8 +87,8 @@ var Sink = function () {
         }
         Recv.stop();
         const blob = await Zstd.decompress(name, id);
-        const file = await blob.arrayBuffer();
-        parent.postMessage({ source: 'qrrec-color', type: 'complete', name: name, bytes: blob.size, file: file }, location.origin, [file]);
+        Recv.show_result(name, blob);
+        parent.postMessage({ source: 'qrrec-color', type: 'complete', name: name, bytes: blob.size, mime: blob.type || 'application/octet-stream' }, location.origin);
       } catch (error) {
         console.log("failed finish copy or download?? " + error);
         parent.postMessage({ source: 'qrrec-color', type: 'runtime-error', phase: 'decode', reason: String(error) }, location.origin);
@@ -125,11 +125,13 @@ var Recv = function () {
   var _rejectedFrames = 0;
   var _errorFrames = 0;
   var _lastPipelineReport = 0;
+  var _pipelineStartedAt = performance.now();
 
   function reportPipeline(force) {
     const now = performance.now();
     if (!force && now - _lastPipelineReport < 250) return;
     _lastPipelineReport = now;
+    const elapsed = Math.max((now - _pipelineStartedAt) / 1000, 0.001);
     parent.postMessage({
       source: 'qrrec-color',
       type: 'pipeline-stats',
@@ -139,7 +141,10 @@ var Recv = function () {
       noData: _noDataFrames,
       rejected: _rejectedFrames,
       errors: _errorFrames,
-      inFlight: _framesInFlight
+      inFlight: _framesInFlight,
+      captureFps: _capturedFrames / elapsed,
+      submitFps: _submittedFrames / elapsed,
+      decodeFps: _decodedFrames / elapsed
     }, location.origin);
   }
 
@@ -265,6 +270,7 @@ var Recv = function () {
         _rejectedFrames = 0;
         _errorFrames = 0;
         _lastPipelineReport = 0;
+        _pipelineStartedAt = performance.now();
       }
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
@@ -339,6 +345,46 @@ var Recv = function () {
     download_bytes: function (buff, name) {
       var blob = new Blob([buff], { type: 'application/octet-stream' });
       Zstd.download_blob(name, blob);
+    },
+
+    show_result: function (name, blob) {
+      const result = document.getElementById('result');
+      const preview = document.getElementById('result-preview');
+      const filename = document.getElementById('result-name');
+      const meta = document.getElementById('result-meta');
+      const save = document.getElementById('result-save');
+      const url = URL.createObjectURL(blob);
+      const extension = (name.split('.').pop() || '').toLowerCase();
+      const imageTypes = ['png','jpg','jpeg','gif','webp','heic','bmp','svg'];
+      const videoTypes = ['mp4','mov','m4v','webm'];
+      const audioTypes = ['mp3','m4a','aac','wav','ogg'];
+
+      filename.textContent = name;
+      meta.textContent = (blob.size / 1024).toFixed(blob.size > 1024 * 1024 ? 0 : 1) + ' KB · 已接收完成';
+      preview.replaceChildren();
+      let media;
+      if (imageTypes.includes(extension)) {
+        media = document.createElement('img');
+        media.src = url;
+      } else if (videoTypes.includes(extension)) {
+        media = document.createElement('video');
+        media.src = url; media.controls = true; media.playsInline = true;
+      } else if (audioTypes.includes(extension)) {
+        media = document.createElement('audio');
+        media.src = url; media.controls = true;
+      } else if (extension === 'txt' || extension === 'md' || extension === 'json' || extension === 'csv') {
+        media = document.createElement('pre');
+        blob.text().then(text => media.textContent = text.slice(0, 200000));
+      } else {
+        media = document.createElement('div');
+        media.className = 'file-placeholder';
+        media.textContent = extension ? extension.toUpperCase() : 'FILE';
+      }
+      preview.appendChild(media);
+      save.href = url;
+      save.download = name;
+      document.getElementById('container').hidden = true;
+      result.hidden = false;
     },
 
     on_decode: function (wid, data) {

@@ -5,16 +5,24 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
   <title>QRREC 彩色矩阵解码运行层</title>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}html,body,#container,video{width:100%;height:100%;overflow:hidden;background:#05070a}
-    video{display:block;object-fit:cover}.compat{display:none!important}
+    *{box-sizing:border-box;margin:0;padding:0}html,body,#container,#container>video{width:100%;height:100%;overflow:hidden;background:#05070a}
+    #container>video{display:block;object-fit:cover}.compat{display:none!important}
+    #result{width:100%;height:100%;padding:18px;background:#080b10;color:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:auto}
+    #result-card{min-height:100%;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;text-align:center}
+    #result-preview{width:100%;min-height:55%;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;background:#030507}
+    #result-preview img,#result-preview video{display:block;max-width:100%;max-height:68vh;object-fit:contain}
+    #result-preview audio{width:90%}#result-preview pre{width:100%;max-height:62vh;padding:16px;text-align:left;white-space:pre-wrap;overflow:auto;color:#d9dde7}
+    .file-placeholder{font:800 44px ui-monospace;color:#ffb86b}.result-name{font-weight:750;word-break:break-all}.result-meta{font-size:13px;color:#949aa7}
+    #result-save{display:block;width:100%;padding:13px;border-radius:999px;background:#ffb86b;color:#16100a;font-weight:800;text-decoration:none}
   </style>
 </head>
 <body>
   <div id="container"><video id="video" autoplay playsinline muted></video></div>
+  <section id="result" hidden><div id="result-card"><div id="result-preview"></div><div id="result-name" class="result-name"></div><div id="result-meta" class="result-meta"></div><a id="result-save">保存 / 下载文件</a></div></section>
   <div class="compat">
     <div id="crosshair1"></div><div id="crosshair2"></div>
     <div id="nav-container" class="mode-auto">
-      <button id="nav-button"></button><div id="nav-content"></div><span id="mode-val">Auto</span>
+      <button id="nav-button"></button><div id="nav-content"></div><span id="mode-val">B</span>
     </div>
     <div id="debug-button"></div>
     <div id="errorbox"></div><div id="t0"></div><div id="t1"></div><div id="t2"></div><div id="t3"></div>
@@ -34,6 +42,7 @@
       onRuntimeInitialized() {
         clearTimeout(startupTimer);
         runtimeReady = true;
+        Recv.setMode('B');
         parent.postMessage({source:'qrrec-color',type:'runtime-ready'}, location.origin);
         Recv.init_video(video);
       },
@@ -54,6 +63,7 @@
     window.addEventListener('unhandledrejection',event=>parent.postMessage({
       source:'qrrec-color',type:'runtime-error',phase:runtimeReady?'decode':'startup',reason:String(event.reason)
     },location.origin));
+    window.QRRECV5 = { setMode(mode) { Recv.setMode(mode); } };
   </script>
   <script src="cimbar_js.2026-07-13T0523.js"></script>
 </body>

@@ -31,6 +31,34 @@ struct ReceiverView: View {
                     .foregroundStyle(model.hasError ? Color.red : Color(red: 1, green: 0.72, blue: 0.42))
                     .lineLimit(2).multilineTextAlignment(.center)
 
+                Picker("识别模式", selection: $model.selectedMode) {
+                    ForEach(["B", "Bm", "Bu", "4C", "Auto"], id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
+                    metric("采集", String(format: "%.1f FPS", model.captureFPS))
+                    metric("提交", String(format: "%.1f FPS", model.submitFPS))
+                    metric("解码", String(format: "%.2f FPS", model.decodeFPS), good: model.decodeFPS > 0)
+                    metric("处理中", "\(model.inFlight)")
+                    metric("采集帧", "\(model.captured)")
+                    metric("提交帧", "\(model.submitted)")
+                    metric("成功帧", "\(model.decoded)", good: model.decoded > 0)
+                    metric("已收数据", byteText(model.decodedBytes), good: model.decodedBytes > 0)
+                    metric("未定位", "\(model.rejected)")
+                    metric("无数据", "\(model.noData)")
+                    metric("错误", "\(model.errors)", bad: model.errors > 0)
+                    metric("文件进度", "\(Int(model.progress * 100))%", good: model.progress > 0)
+                }
+
+                if model.progress > 0 && model.progress < 1 {
+                    ProgressView(value: model.progress) {
+                        Text("文件接收进度 \(Int(model.progress * 100))%")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .tint(Color(red: 0.38, green: 0.87, blue: 0.63))
+                }
+
                 ZStack {
                     CimbarReceiverWebView(model: model, downloadedFile: $shareURL)
                     ScanCorners().padding(34).allowsHitTesting(false)
@@ -39,7 +67,7 @@ struct ReceiverView: View {
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
                 .shadow(color: .black.opacity(0.45), radius: 28, y: 14)
 
-                Text("将彩色矩阵完整放入取景框。收到文件后会自动打开系统分享面板。")
+                Text("将彩色矩阵完整放入取景框。文件接收完成后会先在 App 内预览，再由你选择保存或下载。")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -48,6 +76,24 @@ struct ReceiverView: View {
         .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
         .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
         .sheet(item: $shareURL) { ShareSheet(url: $0) }
+    }
+
+    private func metric(_ title: String, _ value: String, good: Bool = false, bad: Bool = false) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(bad ? Color.red : (good ? Color(red: 0.38, green: 0.87, blue: 0.63) : .white))
+                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(title).font(.system(size: 9)).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 6)
+        .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.07)))
+    }
+
+    private func byteText(_ bytes: Int) -> String {
+        if bytes >= 1_048_576 { return String(format: "%.1f MB", Double(bytes) / 1_048_576) }
+        if bytes >= 1_024 { return String(format: "%.1f KB", Double(bytes) / 1_024) }
+        return "\(bytes) B"
     }
 
     private func capability(_ title: String, _ ready: Bool) -> some View {

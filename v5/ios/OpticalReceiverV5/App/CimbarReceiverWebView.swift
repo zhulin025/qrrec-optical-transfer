@@ -7,6 +7,21 @@ final class ReceiverModel: ObservableObject {
     @Published var cameraReady = false
     @Published var decoderReady = false
     @Published var hasError = false
+    @Published var selectedMode = "B"
+    @Published var captured = 0
+    @Published var submitted = 0
+    @Published var decoded = 0
+    @Published var noData = 0
+    @Published var rejected = 0
+    @Published var errors = 0
+    @Published var inFlight = 0
+    @Published var captureFPS = 0.0
+    @Published var submitFPS = 0.0
+    @Published var decodeFPS = 0.0
+    @Published var decodedBytes = 0
+    @Published var progress = 0.0
+    @Published var completedName: String?
+    @Published var completedBytes = 0
 }
 
 struct CimbarReceiverWebView: UIViewRepresentable {
@@ -57,7 +72,12 @@ struct CimbarReceiverWebView: UIViewRepresentable {
         return web
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {}
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.lastMode != model.selectedMode else { return }
+        context.coordinator.lastMode = model.selectedMode
+        let mode = model.selectedMode.replacingOccurrences(of: "'", with: "")
+        webView.evaluateJavaScript("window.QRRECV5?.setMode('\(mode)')")
+    }
 
     final class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate {
         let model: ReceiverModel
@@ -65,6 +85,7 @@ struct CimbarReceiverWebView: UIViewRepresentable {
         weak var webView: WKWebView?
         var pendingDownloadURL: URL?
         var server: LocalWebServer?
+        var lastMode: String?
 
         init(model: ReceiverModel, downloadedFile: Binding<URL?>) {
             self.model = model; self.downloadedFile = downloadedFile
@@ -79,11 +100,39 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                     self.model.cameraReady = true
                     let w = info["width"] as? Int ?? 0, h = info["height"] as? Int ?? 0
                     self.model.status = "相机 \(w)×\(h) · 等待彩色光码"
+                case "pipeline-stats":
+                    self.model.captured = Self.int(info["captured"])
+                    self.model.submitted = Self.int(info["submitted"])
+                    self.model.decoded = Self.int(info["decoded"])
+                    self.model.noData = Self.int(info["noData"])
+                    self.model.rejected = Self.int(info["rejected"])
+                    self.model.errors = Self.int(info["errors"])
+                    self.model.inFlight = Self.int(info["inFlight"])
+                    self.model.captureFPS = Self.double(info["captureFps"])
+                    self.model.submitFPS = Self.double(info["submitFps"])
+                    self.model.decodeFPS = Self.double(info["decodeFps"])
+                    if self.model.decoded > 0 { self.model.status = "已识别光码，正在接收文件…" }
+                    else if self.model.noData > 0 { self.model.status = "已定位矩阵，正在提取有效数据…" }
+                    else if self.model.rejected > 0 { self.model.status = "正在扫描画面 · 请保持四角完整清晰" }
+                case "decoded-frame":
+                    self.model.decodedBytes += Self.int(info["bytes"])
+                    self.model.status = "正在接收文件…"
+                case "progress":
+                    let values = (info["values"] as? [NSNumber])?.map(\.doubleValue) ?? []
+                    self.model.progress = values.max() ?? self.model.progress
+                case "complete":
+                    self.model.completedName = info["name"] as? String ?? "接收文件"
+                    self.model.completedBytes = Self.int(info["bytes"])
+                    self.model.progress = 1
+                    self.model.status = "文件接收完成 · 可预览并保存"
                 case "runtime-error": self.model.hasError = true; self.model.status = "解码失败：\(info["reason"] ?? "未知错误")"
                 default: break
                 }
             }
         }
+
+        private static func int(_ value: Any?) -> Int { (value as? NSNumber)?.intValue ?? 0 }
+        private static func double(_ value: Any?) -> Double { (value as? NSNumber)?.doubleValue ?? 0 }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             model.status = "页面已加载，正在初始化 libcimbar…"
