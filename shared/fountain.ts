@@ -17,10 +17,17 @@
 
 import { splitmix32 } from "./protocol";
 
+// Hexadecimal floating-point literals are not available in JavaScript. This
+// decimal is the exact shortest representation of the IEEE-754 binary64 ln(2)
+// value used by the algorithm, so every engine parses the same 64 bits.
 const LN2 = 0.6931471805599453;
 
 /** Deterministic natural log: exact-ops range reduction + atanh series. */
 function dlog(x: number): number {
+  if (Number.isNaN(x) || x < 0) return Number.NaN;
+  if (x === 0) return Number.NEGATIVE_INFINITY;
+  if (x === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
+
   let e = 0;
   let m = x;
   while (m >= 1.5) {

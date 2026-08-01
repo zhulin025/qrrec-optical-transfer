@@ -42,6 +42,8 @@ let decoder: LTDecoder | null = null;
 let sessionId = 0;
 let startTs = 0;
 let captureGen = 0;
+let pendingVideoCallback: number | null = null;
+let pendingAnimationFrame: number | null = null;
 let done = false;
 let pulseIndex = 0;
 
@@ -185,7 +187,24 @@ function getCameraConfig() {
   };
 }
 
-async function requestCamera() {
+interface CameraRequestResult {
+  stream: MediaStream;
+  settings: MediaTrackSettings;
+  usedFallback: boolean;
+  requestedFps: number;
+}
+
+function readCameraSettings(candidate: MediaStream): MediaTrackSettings {
+  return candidate.getVideoTracks()[0]?.getSettings() ?? {};
+}
+
+function fpsMatches(actual: number | undefined, requested: number): boolean {
+  // WebKit sometimes reports a fractional nominal rate. A small tolerance
+  // distinguishes real 60 fps capture from the silent 30 fps downgrade.
+  return actual !== undefined && Math.abs(actual - requested) < 1;
+}
+
+async function requestCamera(): Promise<CameraRequestResult> {
   const { captureWidth, captureFps, deviceId } = getCameraConfig();
   const base: MediaTrackConstraints = {
     ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: "environment" }),
@@ -193,16 +212,39 @@ async function requestCamera() {
     height: { ideal: Math.round((captureWidth * 3) / 4) },
   };
   try {
-    return await navigator.mediaDevices.getUserMedia({
+    const exactStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: { ...base, frameRate: { exact: captureFps } },
     });
+    const settings = readCameraSettings(exactStream);
+    if (fpsMatches(settings.frameRate, captureFps)) {
+      return { stream: exactStream, settings, usedFallback: false, requestedFps: captureFps };
+    }
+    // Do not trust a successfully resolved getUserMedia call: iOS has shipped
+    // versions that silently violate the requested frame rate.
+    exactStream.getTracks().forEach((track) => track.stop());
   } catch {
-    return navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { ...base, frameRate: { ideal: captureFps } },
-    });
+    // Unsupported exact constraints are expected; retry below with ideal.
   }
+  const fallbackStream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: { ...base, frameRate: { ideal: captureFps } },
+  });
+  return {
+    stream: fallbackStream,
+    settings: readCameraSettings(fallbackStream),
+    usedFallback: true,
+    requestedFps: captureFps,
+  };
+}
+
+function cameraStatus(camera: CameraRequestResult): string {
+  const { width, height, frameRate } = camera.settings;
+  const actual = frameRate === undefined ? "未知帧率" : `${frameRate} fps`;
+  const warning = camera.usedFallback || !fpsMatches(frameRate, camera.requestedFps)
+    ? ` · 已降级（请求 ${camera.requestedFps} fps，实际 ${actual}）`
+    : "";
+  return `摄像头 ${width ?? "?"}×${height ?? "?"}@${actual}${warning} · 等待光码`;
 }
 
 async function populateCameras() {
@@ -219,16 +261,16 @@ async function populateCameras() {
 
 async function switchCamera() {
   try {
-    const nextStream = await requestCamera();
+    const nextCamera = await requestCamera();
+    stopCaptureLoop();
     stream?.getTracks().forEach((track) => track.stop());
-    stream = nextStream;
+    stream = nextCamera.stream;
     video.srcObject = stream;
     await video.play().catch(() => undefined);
-    const camera = stream.getVideoTracks()[0];
-    const config = camera?.getSettings();
-    stats.textContent = `摄像头 ${config?.width}×${config?.height}@${config?.frameRate} · 等待光码`;
+    stats.textContent = cameraStatus(nextCamera);
     setCapability("camera", "pass", "通过");
     await populateCameras();
+    startCaptureLoop();
   } catch (err) {
     setCapability("camera", "fail", "切换失败");
     stats.textContent = `✗ 摄像头：${err instanceof Error ? err.message : String(err)}`;
@@ -249,7 +291,9 @@ async function start() {
   preview.style.display = "block";
   metricsEl.style.display = "grid";
   try {
-    stream = await requestCamera();
+    const camera = await requestCamera();
+    stream = camera.stream;
+    stats.textContent = cameraStatus(camera);
   } catch (err) {
     setCapability("camera", "fail", "授权失败");
     stats.textContent = `✗ camera: ${err instanceof Error ? err.message : String(err)}`;
@@ -259,7 +303,6 @@ async function start() {
   video.srcObject = stream;
   await video.play().catch(() => undefined);
   await populateCameras();
-  stats.textContent = `摄像头 ${stream.getVideoTracks()[0]?.getSettings().width}×${stream.getVideoTracks()[0]?.getSettings().height}@${stream.getVideoTracks()[0]?.getSettings().frameRate} · 等待光码`;
 
   if (__XHS_MAIN_THREAD__) {
     try {
@@ -280,8 +323,7 @@ async function start() {
   }
   /* XHS_WORKER_END */
 
-  captureGen++;
-  scheduleFrame(captureGen);
+  startCaptureLoop();
   setInterval(updateStats, 500);
   try {
     await (navigator as Navigator & { wakeLock?: { request(t: "screen"): Promise<unknown> } })
@@ -291,18 +333,37 @@ async function start() {
   }
 }
 
-type VideoRVFC = HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+type VideoRVFC = HTMLVideoElement & {
+  requestVideoFrameCallback?: (cb: () => void) => number;
+  cancelVideoFrameCallback?: (id: number) => void;
+};
+
+function stopCaptureLoop() {
+  captureGen++;
+  const v = video as VideoRVFC;
+  if (pendingVideoCallback !== null) v.cancelVideoFrameCallback?.(pendingVideoCallback);
+  if (pendingAnimationFrame !== null) cancelAnimationFrame(pendingAnimationFrame);
+  pendingVideoCallback = null;
+  pendingAnimationFrame = null;
+}
+
+function startCaptureLoop() {
+  stopCaptureLoop();
+  scheduleFrame(captureGen);
+}
 
 function scheduleFrame(gen: number) {
   if (done || gen !== captureGen) return;
   const v = video as VideoRVFC;
   const next = () => {
+    pendingVideoCallback = null;
+    pendingAnimationFrame = null;
     if (done || gen !== captureGen) return;
     captureFrame();
     scheduleFrame(gen);
   };
-  if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(next);
-  else requestAnimationFrame(next);
+  if (v.requestVideoFrameCallback) pendingVideoCallback = v.requestVideoFrameCallback(next);
+  else pendingAnimationFrame = requestAnimationFrame(next);
 }
 
 const grab = document.createElement("canvas");
@@ -405,7 +466,7 @@ function onDecoded(bytes: Uint8Array) {
 
 function finish(payload: Uint8Array, hashOk: boolean, seconds: number, totalLen: number) {
   done = true;
-  captureGen++;
+  stopCaptureLoop();
   stream?.getTracks().forEach((t) => t.stop());
   preview.style.display = "none";
   bar.style.width = "100%";
