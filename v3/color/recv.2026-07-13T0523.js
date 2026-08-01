@@ -29,6 +29,7 @@ var Sink = function () {
       if (buff.length == 0) { // sanity check
         return;
       }
+      parent.postMessage({ source: 'qrrec-color', type: 'decoded-frame', bytes: buff.length }, location.origin);
       const fountBuff = fountain_buff();
       fountBuff.set(buff);
 
@@ -83,6 +84,7 @@ var Sink = function () {
           name = new TextDecoder("utf-8").decode(temparr);
         }
         Zstd.decompress(name, id);
+        parent.postMessage({ source: 'qrrec-color', type: 'complete', name: name, bytes: size }, location.origin);
       } catch (error) {
         console.log("failed finish copy or download?? " + error);
       }
@@ -435,6 +437,7 @@ var Recv = function () {
     render_progress: function (report) {
       console.log("progress!!!!" + report);
       Recv.set_HTML("tdec", "progress " + report);
+      parent.postMessage({ source: 'qrrec-color', type: 'progress', values: report }, location.origin);
       const progress_container = document.getElementById('progress_bars');
       const query = '#progress_bars > div[class="progress"]';
       const prev = document.querySelectorAll(query);

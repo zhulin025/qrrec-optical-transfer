@@ -20,8 +20,7 @@
     html.qrrec-embed #nav-container{display:none!important}
     html.qrrec-embed #container{z-index:0;border-radius:20px}
     html.qrrec-embed video{z-index:0;object-fit:cover}
-    html.qrrec-embed .crosshairs{z-index:2}
-    html.qrrec-embed #progress_bars{z-index:3}
+    html.qrrec-embed .crosshairs,html.qrrec-embed #progress_bars{display:none!important}
 
     html,
     body {
@@ -440,8 +439,10 @@
 
     var Module = {};
     Module.onRuntimeInitialized = () => {
+      parent.postMessage({ source: 'qrrec-color', type: 'runtime-ready' }, location.origin);
       Recv.init_video(video);
     };
+    video.addEventListener('playing', () => parent.postMessage({ source: 'qrrec-color', type: 'camera-ready', width: video.videoWidth, height: video.videoHeight }, location.origin));
   </script>
 
   <script src="cimbar_js.2026-07-13T0523.js"></script>
