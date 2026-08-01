@@ -13,7 +13,10 @@
   <div id="container"><video id="video" autoplay playsinline muted></video></div>
   <div class="compat">
     <div id="crosshair1"></div><div id="crosshair2"></div>
-    <button id="nav-button"></button><div id="nav-content"></div><div id="debug-button"></div>
+    <div id="nav-container" class="mode-auto">
+      <button id="nav-button"></button><div id="nav-content"></div><span id="mode-val">Auto</span>
+    </div>
+    <div id="debug-button"></div>
     <div id="errorbox"></div><div id="t0"></div><div id="t1"></div><div id="t2"></div><div id="t3"></div>
     <div id="framesInFlight"></div><div id="tdec"></div><div id="progress_bars"><div class="progress"></div></div>
   </div>
@@ -22,17 +25,24 @@
   <script>
     Recv.init_ww(4);
     const video = document.querySelector('#video');
+    let runtimeReady = false;
     var Module = {
       onRuntimeInitialized() {
+        runtimeReady = true;
         parent.postMessage({source:'qrrec-color',type:'runtime-ready'}, location.origin);
         Recv.init_video(video);
       },
       onAbort(reason) {
-        parent.postMessage({source:'qrrec-color',type:'runtime-error',reason:String(reason)}, location.origin);
+        parent.postMessage({source:'qrrec-color',type:'runtime-error',phase:'wasm',reason:String(reason)}, location.origin);
       }
     };
     video.addEventListener('playing',()=>parent.postMessage({source:'qrrec-color',type:'camera-ready',width:video.videoWidth,height:video.videoHeight},location.origin));
-    window.addEventListener('error',event=>parent.postMessage({source:'qrrec-color',type:'runtime-error',reason:event.message},location.origin));
+    window.addEventListener('error',event=>parent.postMessage({
+      source:'qrrec-color',
+      type:'runtime-error',
+      phase:runtimeReady?'decode':'startup',
+      reason:event.message
+    },location.origin));
   </script>
   <script src="cimbar_js.2026-07-13T0523.js"></script>
 </body>

@@ -52,6 +52,7 @@ const metrics = colorPanel.querySelector<HTMLElement>("#color-metrics")!;
 const progress = colorPanel.querySelector<HTMLElement>("#color-progress")!;
 let frames = 0;
 let bytes = 0;
+let colorRuntimeReady = false;
 
 function capability(id: string, state: "pass" | "fail", label: string) {
   const el = colorPanel.querySelector<HTMLElement>(`#${id}`)!;
@@ -73,6 +74,7 @@ window.addEventListener("message", (event) => {
   if (event.origin !== location.origin || event.data?.source !== "qrrec-color") return;
   const message = event.data;
   if (message.type === "runtime-ready") {
+    colorRuntimeReady = true;
     capability("color-cap-worker", "pass", "已启动");
     capability("color-cap-wasm", "pass", "已加载");
     stats.textContent = "解码器已就绪，正在申请摄像头";
@@ -100,8 +102,14 @@ window.addEventListener("message", (event) => {
     colorPanel.querySelector("#color-percent")!.textContent = "100%";
     colorPanel.querySelector("#color-progress-value")!.textContent = "100%";
   } else if (message.type === "runtime-error") {
-    capability("color-cap-wasm", "fail", "加载失败");
-    stats.textContent = `彩色矩阵解码器加载失败：${message.reason || "未知错误"}`;
+    const startupFailure = !colorRuntimeReady || message.phase === "wasm" || message.phase === "startup";
+    if (startupFailure) {
+      capability("color-cap-wasm", "fail", "加载失败");
+      stats.textContent = `彩色矩阵解码器加载失败：${message.reason || "未知错误"}`;
+    } else {
+      capability("color-cap-wasm", "pass", "已加载");
+      stats.textContent = `彩色矩阵识别出错：${message.reason || "未知错误"}`;
+    }
   }
 });
 
@@ -112,6 +120,7 @@ function stopColor() {
   }
   preview.style.display = "none";
   start.style.display = "block";
+  colorRuntimeReady = false;
 }
 
 function select(tab: "qr" | "color") {
