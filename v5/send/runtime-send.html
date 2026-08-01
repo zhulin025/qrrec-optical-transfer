@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>QRREC 彩色矩阵编码运行层</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}html,body,#dragdrop{width:100%;height:100%;overflow:hidden;background:#fff}
+    #dragdrop{display:grid;place-items:center}#canvas{display:block;max-width:100%;max-height:100%;object-fit:contain}.compat{display:none!important}
+  </style>
+</head>
+<body>
+  <div id="dragdrop"><canvas id="canvas"></canvas></div>
+  <input class="compat" type="file" id="file_input" onchange="Main.fileInput(this)">
+  <div class="compat">
+    <div id="status"></div><a id="invisible_click"></a><div id="nav-container" class="mode-b"></div>
+    <button id="nav-button"></button><div id="nav-content"></div><span id="current-file"></span><span id="mode-val"></span>
+  </div>
+  <script src="send.2026-07-13T0523.js?v=3"></script>
+  <script src="main.2026-07-13T0523.js?v=3"></script>
+  <script>
+    const canvas=document.getElementById('canvas');
+    if(!Main.init_ww(canvas)){
+      var Module={canvas,onRuntimeInitialized(){Main.init(canvas);parent.postMessage({source:'qrrec-color-send',type:'runtime-ready'},location.origin)}};
+    } else {
+      parent.postMessage({source:'qrrec-color-send',type:'runtime-ready'},location.origin);
+    }
+  </script>
+  <script src="cimbar_js.2026-07-13T0523.js"></script>
+</body>
+</html>

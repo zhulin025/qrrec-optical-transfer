@@ -54,7 +54,7 @@ async function main() {
   if (enablePwa && "serviceWorker" in navigator && window.isSecureContext) {
     void navigator.serviceWorker.register("../service-worker.js", { scope: "../" });
   }
-  const receiverUrl = configuredReceiverUrl || new URL("../", window.location.href).href;
+  const receiverUrl = configuredReceiverUrl || "https://qrrec.liuwa.xyz/";
   receiverLink.href = allowReceiverNav ? receiverUrl : "#";
   receiverLink.textContent = new URL(receiverUrl).host;
   if (!allowReceiverNav) {

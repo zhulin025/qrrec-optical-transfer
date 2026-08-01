@@ -18,6 +18,8 @@
     "build:color:v3": "node scripts/copy_v3_color.mjs",
     "build:receiver:v4": "vite build --config vite.v4-receiver.config.ts",
     "build:sender:v4": "vite build --config vite.v4-sender.config.ts",
+    "dev:sender:v5": "vite --config vite.v5-sender.config.ts",
+    "build:sender:v5": "vite build --config vite.v5-sender.config.ts",
     "build:receiver:xhs": "vite build --config vite.receiver-xhs.config.ts",
     "generate:wasm-inline": "node scripts/generate_inline_wasm.mjs",
     "build:receiver:xhs:inline": "npm run generate:wasm-inline && vite build --config vite.receiver-xhs-inline.config.ts",
