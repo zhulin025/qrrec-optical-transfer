@@ -27,7 +27,7 @@ Open the sender on a laptop or another bright screen, select a file, then open t
 V3 leaves V1 and V2 unchanged and exposes two independent optical channels:
 
 - **Optimized dual QR** at `/v3/` and `/v3/send/`: 30 display ticks per second, overlapping left/right ROI acquisition, two parallel decode workers, stable-frame filtering, and a 128-sample visual fingerprint that avoids spending decode time on the same displayed frame twice.
-- **Cimbar color matrix (experimental)** at `/v3/color/recv.html` and `/v3/color/`: the official browser runtime from `sz3/libcimbar`, using shape and color symbols, Reed–Solomon correction, interleaving, Wirehair fountain coding, and zstd compression. This channel is protocol-incompatible with QRREC's QR modes; use its matching sender and receiver.
+- **Color matrix (experimental)** is available as an in-page tab on `/v3/` and `/v3/send/`. It reuses the encoding/decoding runtime from `sz3/libcimbar` (shape and color symbols, Reed–Solomon correction, interleaving, Wirehair fountain coding, and zstd compression) while keeping QRREC's own interface. This channel is protocol-incompatible with QRREC's QR modes; use the color-matrix tab on both ends.
 
 The color-matrix runtime is MPL-2.0 software and remains clearly separated from QRREC's MIT-licensed source. Its license, pinned upstream commit, and integration changes are documented in `v3/color/NOTICE.md` and `v3/color/LICENSE.libcimbar`.
 
@@ -67,8 +67,7 @@ The static site is generated in `release/web-receiver` with these routes:
 
 - `/` and `/send/`: V1 receiver and sender
 - `/v2/` and `/v2/send/`: V2 receiver and sender
-- `/v3/` and `/v3/send/`: optimized V3 dual-QR receiver and sender
-- `/v3/color/recv.html` and `/v3/color/`: V3 color-matrix receiver and sender
+- `/v3/` and `/v3/send/`: V3 receiver and sender, each with High-speed QR and Color matrix tabs
 
 Camera access requires HTTPS except on `localhost`. For phone testing, use an HTTPS development origin or deploy the static build.
 

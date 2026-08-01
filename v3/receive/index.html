@@ -15,8 +15,12 @@
     <link rel="stylesheet" href="../../shared/style.css" />
     <style>
       .v3-mode-nav{display:flex;width:min(560px,calc(100% - 32px));margin:0 auto 18px;padding:5px;gap:5px;border:1px solid #29313e;border-radius:14px;background:#10151e}
-      .v3-mode-nav a,.v3-mode-nav span{flex:1;padding:10px 12px;border-radius:10px;color:#aab3c3;text-align:center;text-decoration:none;font-size:14px}
+      .v3-mode-nav button{flex:1;padding:10px 12px;border:0;border-radius:10px;color:#aab3c3;text-align:center;font:inherit;font-size:14px;background:transparent;cursor:pointer}
       .v3-mode-nav .active{color:#06140e;background:#62dfa0;font-weight:700}
+      .v3-tab-panel[hidden]{display:none!important}
+      .color-intro{width:min(760px,calc(100% - 32px));margin:0 auto 16px;text-align:center}
+      .color-runtime{width:min(920px,calc(100% - 32px));height:min(72vh,760px);margin:0 auto 16px;border:1px solid #29313e;border-radius:22px;overflow:hidden;background:#05070a;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+      .color-runtime iframe{display:block;width:100%;height:100%;border:0;background:#05070a}
     </style>
   </head>
   <body>
@@ -26,8 +30,8 @@
       <p>30 FPS 双码、画面去重、双 ROI 与彩色矩阵实验通道。</p>
     </header>
     <nav class="v3-mode-nav" aria-label="V3 码制">
-      <span class="active">高速双 QR</span>
-      <a href="./color/recv.html">彩色矩阵实验版</a>
+      <button type="button" class="active" data-v3-tab="qr">高速双 QR</button>
+      <button type="button" data-v3-tab="color">彩色矩阵</button>
     </nav>
     <div class="hint status-pill" id="stats">准备接收光码</div>
     <section class="capabilities" aria-label="运行能力">
@@ -103,5 +107,6 @@
     </section>
     <div id="result"></div>
     <script type="module" src="./main.ts"></script>
+    <script type="module" src="./tabs.ts"></script>
   </body>
 </html>

@@ -24,6 +24,9 @@ const receiverLinkQr = document.getElementById("receiver-link-qr") as HTMLCanvas
 let generation = 0;
 let selectedFile: File | null = null;
 
+window.addEventListener("qrrec:pause-sender", () => { generation++; });
+window.addEventListener("qrrec:resume-sender", () => { if (selectedFile) void startStream(); });
+
 const formatBytes = (bytes: number) => bytes < 1024
   ? `${bytes} B`
   : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;

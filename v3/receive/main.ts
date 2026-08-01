@@ -192,6 +192,17 @@ if ("serviceWorker" in navigator && window.isSecureContext) {
 }
 
 startBtn.onclick = () => void start();
+window.addEventListener("qrrec:pause", () => {
+  captureGen++;
+  stream?.getTracks().forEach((track) => track.stop());
+  stream = null;
+  video.srcObject = null;
+  preview.style.display = "none";
+  if (!done) {
+    startBtn.style.display = "block";
+    startBtn.textContent = "开启摄像头接收";
+  }
+});
 cfgCamera.onchange = () => {
   if (!stream) return;
   localStorage.setItem("qrrec-camera", cfgCamera.value);

@@ -6,6 +6,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no">
   <link rel="manifest" href="pwa-recv.2026-07-13T0523.json">
+  <script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('qrrec-embed')</script>
 </head>
 
 <body>
@@ -15,6 +16,12 @@
       margin: 0;
       padding: 0;
     }
+    html.qrrec-embed body{background:#05070a;background-image:none;overflow:hidden}
+    html.qrrec-embed #nav-container{display:none!important}
+    html.qrrec-embed #container{z-index:0;border-radius:20px}
+    html.qrrec-embed video{z-index:0;object-fit:cover}
+    html.qrrec-embed .crosshairs{z-index:2}
+    html.qrrec-embed #progress_bars{z-index:3}
 
     html,
     body {
