@@ -334,15 +334,6 @@ var Main = function () {
       }
     },
 
-    setStablePosition: function (enabled) {
-      if (_ww) {
-        _ww.postMessage({ fun: 'setStablePosition', args: [enabled] });
-      }
-      else {
-        Send.setStablePosition(enabled);
-      }
-    },
-
     setHTML: function (id, msg) {
       document.getElementById(id).innerHTML = msg;
     },

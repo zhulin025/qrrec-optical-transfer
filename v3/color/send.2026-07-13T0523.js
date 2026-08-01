@@ -7,7 +7,6 @@ var Send = function () {
   // configurable
   var _interval = 66;
   var _colorBalance = false;
-  var _stablePosition = true;
 
   // internal
   var _pause = 0;
@@ -144,12 +143,7 @@ var Send = function () {
         _pause -= 1;
       }
       if (!Send.isPaused()) {
-        // Upstream advances through a four-position shake cycle on every render.
-        // Completing the whole cycle synchronously leaves each visible frame at
-        // the same position while preserving upstream's encoded frame contents.
-        const renderPasses = _stablePosition ? 4 : 1;
-        for (let i = 0; i < renderPasses; i += 1)
-          Module._cimbare_render();
+        Module._cimbare_render();
         var frameCount = Module._cimbare_next_frame(_colorBalance);
       }
 
@@ -175,11 +169,6 @@ var Send = function () {
       }
       _interval = Math.floor(1000 / val);
       console.log("new frame delay interval is " + _interval);
-    },
-
-    setStablePosition: function (enabled) {
-      _stablePosition = Boolean(enabled);
-      console.log("stable positioning is " + (_stablePosition ? "enabled" : "disabled"));
     }
   };
 }();

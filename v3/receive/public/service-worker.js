@@ -1,4 +1,4 @@
-const CACHE = "qrrec-v3-v3";
+const CACHE = "qrrec-v3-v4";
 const APP_SHELL = ["./", "./send/", "./manifest.webmanifest", "./icon.svg", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {

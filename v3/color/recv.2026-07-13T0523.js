@@ -278,7 +278,7 @@ var Recv = function () {
           facingMode: 'environment',
           exposureMode: 'continuous',
           focusMode: 'continuous',
-          frameRate: { ideal: 10 }, // 10 FPS currently gives the best verified browser receive throughput
+          frameRate: { ideal: 15 }, // we're not trying to set the user's phone on fire
         }
       };
 
