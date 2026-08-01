@@ -16,4 +16,5 @@ Local integration changes are limited to relative PWA paths/cache isolation,
 page titles, navigation links back to the QRREC V3 dual-QR pages, and fixing
 the receiver's worker-ready messages being counted as completed video frames.
 Both pages register one scope-safe integration service worker instead of
-competing sender and receiver workers for the same browser scope.
+competing sender and receiver workers for the same browser scope. Empty/error
+worker responses are ignored safely instead of dereferencing a missing buffer.

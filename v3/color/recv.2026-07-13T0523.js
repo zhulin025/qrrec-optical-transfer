@@ -323,6 +323,11 @@ var Recv = function () {
       _recentDecode = _counter;
 
       const buff = data.buff;
+      if (!buff) {
+        if (data.error)
+          Recv.set_HTML("t" + wid, "worker returned no frame data");
+        return;
+      }
       if (buff.length > 0) {
         Recv.setMode(data.mode); // call *before* we send it to the sink. This is our autodetect confirm.
       }

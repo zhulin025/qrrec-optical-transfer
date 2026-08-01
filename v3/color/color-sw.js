@@ -1,4 +1,4 @@
-const CACHE = "qrrec-v3-color-v1";
+const CACHE = "qrrec-v3-color-v2";
 const FILES = [
   "./", "./index.html", "./recv.html",
   "./cimbar_js.2026-07-13T0523.js", "./cimbar_js.2026-07-13T0523.wasm",
