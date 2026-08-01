@@ -383,8 +383,10 @@ function captureFrame() {
     if (mainThreadDecodeBusy || now - lastMainThreadDecode < 120) return;
     lastMainThreadDecode = now;
   }
-  const slot = __XHS_MAIN_THREAD__ ? -1 : busy.indexOf(false);
-  if (!__XHS_MAIN_THREAD__ && slot === -1) return; // all workers busy — drop the frame
+  const freeSlots = __XHS_MAIN_THREAD__ ? [] : busy
+    .map((isBusy, index) => isBusy ? -1 : index)
+    .filter((index) => index >= 0);
+  if (!__XHS_MAIN_THREAD__ && freeSlots.length === 0) return; // all workers busy — drop the frame
   const scale = Math.min(1, decodeTarget / Math.max(vw, vh));
   const decodeWidth = Math.max(1, Math.round(vw * scale));
   const decodeHeight = Math.max(1, Math.round(vh * scale));
@@ -431,17 +433,24 @@ function captureFrame() {
         mainThreadDecodeBusy = false;
       });
   } else {
-    const roi = rois.length === 2 ? rois[slot % 2] : undefined;
-    const crop = roi ? ctx.getImageData(roi.x, roi.y, roi.w, roi.h) : img;
-    const task: DecodeTask = roi
-      ? { x: roi.x, y: roi.y, w: roi.w, h: roi.h, fullW: decodeWidth, fullH: decodeHeight }
-      : { x: 0, y: 0, w: decodeWidth, h: decodeHeight, fullW: decodeWidth, fullH: decodeHeight };
-    const id = frameId++;
-    busy[slot] = true;
-    tasks.set(id, task);
-    workers[slot]!.postMessage({ id, buf: crop.data.buffer, w: crop.width, h: crop.height }, [
-      crop.data.buffer,
-    ]);
+    const dispatch = (slot: number, roi?: Roi) => {
+      const crop = roi ? ctx.getImageData(roi.x, roi.y, roi.w, roi.h) : img;
+      const task: DecodeTask = roi
+        ? { x: roi.x, y: roi.y, w: roi.w, h: roi.h, fullW: decodeWidth, fullH: decodeHeight }
+        : { x: 0, y: 0, w: decodeWidth, h: decodeHeight, fullW: decodeWidth, fullH: decodeHeight };
+      const id = frameId++;
+      busy[slot] = true;
+      tasks.set(id, task);
+      workers[slot]!.postMessage({ id, buf: crop.data.buffer, w: crop.width, h: crop.height }, [crop.data.buffer]);
+    };
+    if (rois.length === 2 && freeSlots.length >= 2) {
+      dispatch(freeSlots[0]!, rois[0]);
+      dispatch(freeSlots[1]!, rois[1]);
+    } else if (rois.length === 2) {
+      dispatch(freeSlots[0]!, rois[frameId % 2]);
+    } else {
+      dispatch(freeSlots[0]!);
+    }
   }
 }
 
