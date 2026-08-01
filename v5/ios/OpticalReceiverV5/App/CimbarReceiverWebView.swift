@@ -20,11 +20,6 @@ final class ReceiverModel: ObservableObject {
     @Published var decodeFPS = 0.0
     @Published var decodedBytes = 0
     @Published var transferRate = 0.0
-    @Published var dropped = 0
-    @Published var roiWidth = 0
-    @Published var roiHeight = 0
-    @Published var pixelFormat = "--"
-    @Published var cameraProfile = "清晰"
     @Published var progress = 0.0
     @Published var completedName: String?
     @Published var completedBytes = 0
@@ -38,7 +33,6 @@ final class ReceiverModel: ObservableObject {
         captureFPS = 0; submitFPS = 0; decodeFPS = 0; decodedBytes = 0; progress = 0
         completedName = nil; completedBytes = 0
         transferRate = 0; sessionStartedAt = Date()
-        dropped = 0; roiWidth = 0; roiHeight = 0; pixelFormat = "--"; cameraProfile = "清晰"
     }
 
     func endSession() {
@@ -141,11 +135,6 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                     self.model.captureFPS = Self.double(info["captureFps"])
                     self.model.submitFPS = Self.double(info["submitFps"])
                     self.model.decodeFPS = Self.double(info["decodeFps"])
-                    self.model.dropped = Self.int(info["dropped"])
-                    self.model.roiWidth = Self.int(info["roiWidth"])
-                    self.model.roiHeight = Self.int(info["roiHeight"])
-                    self.model.pixelFormat = info["pixelFormat"] as? String ?? "--"
-                    self.model.cameraProfile = info["cameraProfile"] as? String ?? "清晰"
                     if self.model.decoded > 0 { self.model.status = "已识别光码，正在接收文件…" }
                     else if self.model.noData > 0 { self.model.status = "已定位矩阵，正在提取有效数据…" }
                     else if self.model.rejected > 0 { self.model.status = "正在扫描画面 · 请保持四角完整清晰" }
