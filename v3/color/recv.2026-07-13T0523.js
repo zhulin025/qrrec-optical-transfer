@@ -3,6 +3,7 @@ var Sink = function () {
   var _fountainBuff = undefined;
   var _errBuff = undefined;
   var _errBuffSize = 1024;
+  var _completed = false;
 
   function fountain_buff() {
     if (_fountainBuff.buffer !== Module.HEAPU8.buffer) {
@@ -26,7 +27,7 @@ var Sink = function () {
     },
 
     on_decode: function (buff) {
-      if (buff.length == 0) { // sanity check
+      if (_completed || buff.length == 0) { // sanity check
         return;
       }
       parent.postMessage({ source: 'qrrec-color', type: 'decoded-frame', bytes: buff.length }, location.origin);
@@ -46,6 +47,7 @@ var Sink = function () {
       }
 
       if (res > 0) {
+        _completed = true;
         const res32t = Number(res & 0xFFFFFFFFn);; // truncate BigInt res (int64_t) to a uint32_t
         Sink.reassemble_file(res32t);
       }
@@ -68,7 +70,7 @@ var Sink = function () {
       }
     },
 
-    reassemble_file: function (id) {
+    reassemble_file: async function (id) {
       const size = Module._cimbard_get_filesize(id);
       //alert("we did it!?! " + size);
       try {
@@ -83,10 +85,13 @@ var Sink = function () {
           const temparr = new Uint8Array(Module.HEAPU8.buffer, _errBuff, fnsize);
           name = new TextDecoder("utf-8").decode(temparr);
         }
-        Zstd.decompress(name, id);
-        parent.postMessage({ source: 'qrrec-color', type: 'complete', name: name, bytes: size }, location.origin);
+        Recv.stop();
+        const blob = await Zstd.decompress(name, id);
+        const file = await blob.arrayBuffer();
+        parent.postMessage({ source: 'qrrec-color', type: 'complete', name: name, bytes: blob.size, file: file }, location.origin, [file]);
       } catch (error) {
         console.log("failed finish copy or download?? " + error);
+        parent.postMessage({ source: 'qrrec-color', type: 'runtime-error', phase: 'decode', reason: String(error) }, location.origin);
       }
     }
   };
@@ -112,6 +117,7 @@ var Recv = function () {
   var _supportedFormats = ["NV12", "I420"]; // have cimbard_* return this somehow?
 
   var _mode = 0;
+  var _done = false;
 
   function _toggleFullscreen() {
     if (document.fullscreenElement) {
@@ -223,6 +229,7 @@ var Recv = function () {
     },
 
     init_video: function (video) {
+      _done = false;
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
 
@@ -279,7 +286,7 @@ var Recv = function () {
     },
 
     restart_paused_camera: function () {
-      if (!_video) {
+      if (_done || !_video) {
         return;
       }
 
@@ -306,6 +313,9 @@ var Recv = function () {
       if (data.ready) {
         if (_workerReady)
           _workerReady();
+        return;
+      }
+      if (_done) {
         return;
       }
       Recv.frames_in_flight_decr();
@@ -341,6 +351,7 @@ var Recv = function () {
       //console.log("on frame");
       // https://developer.mozilla.org/en-US/docs/Web/API/VideoFrame
 
+      if (_done) return;
       _counter += 1;
       if (_workers.length == 0)
         return;
@@ -395,7 +406,21 @@ var Recv = function () {
         vf.close();
 
       // schedule the next one
-      _video.requestVideoFrameCallback(Recv.on_frame);
+      if (!_done)
+        _video.requestVideoFrameCallback(Recv.on_frame);
+    },
+
+    stop: function () {
+      if (_done) return;
+      _done = true;
+      _workers.forEach(worker => worker.terminate());
+      _workers = [];
+      _framesInFlight = 0;
+      const stream = _video && _video.srcObject;
+      if (stream && stream.getTracks)
+        stream.getTracks().forEach(track => track.stop());
+      if (_video)
+        _video.srcObject = null;
     },
 
     captureFrame: function () {

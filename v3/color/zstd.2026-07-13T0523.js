@@ -59,7 +59,7 @@ var Zstd = function () {
     const response = new Response(readstream);
     const blob = await response.blob();
     console.log("download is ready for " + filename + ", size " + blob.size);
-    Zstd.download_blob(filename, blob);
+    return blob;
   }
 
   function saveToFile(readstream, filename) {
@@ -91,7 +91,7 @@ var Zstd = function () {
     decompress: function (name, id) {
       const reader = getDecompressReader(id);
 
-      saveToFile(reader, name);
+      return saveViaBlob(reader, name);
     }
   };
 }();
