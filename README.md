@@ -8,6 +8,7 @@ QRREC lets two devices transfer files through a screen and a camera. The sender 
 | --- | --- | --- | --- |
 | V1 | [qrrec.liuwa.xyz](https://qrrec.liuwa.xyz/) | [qrrec.liuwa.xyz/send/](https://qrrec.liuwa.xyz/send/) | Stable baseline |
 | V2 | [qrrec.liuwa.xyz/v2/](https://qrrec.liuwa.xyz/v2/) | [qrrec.liuwa.xyz/v2/send/](https://qrrec.liuwa.xyz/v2/send/) | High-speed experimental path |
+| V3 | [qrrec.liuwa.xyz/v3/](https://qrrec.liuwa.xyz/v3/) | [qrrec.liuwa.xyz/v3/send/](https://qrrec.liuwa.xyz/v3/send/) | 30 FPS dual QR plus color-matrix channel |
 
 Open the sender on a laptop or another bright screen, select a file, then open the matching receiver on a phone and point its camera at the animated codes. V1 and V2 use different file envelopes; use the matching sender and receiver.
 
@@ -20,6 +21,15 @@ Open the sender on a laptop or another bright screen, select a file, then open t
 - **Dual QR mode** — two independent fountain frames are displayed side by side. Single-code mode remains available for difficult camera or display conditions.
 - **Local result preview** — images, playable video, text, and URLs are shown in the browser; downloading remains an explicit user action.
 - **PWA receiver** — the receiver can be installed and its shell is cached for repeat use. Camera access still requires HTTPS.
+
+## V3 modes
+
+V3 leaves V1 and V2 unchanged and exposes two independent optical channels:
+
+- **Optimized dual QR** at `/v3/` and `/v3/send/`: 30 display ticks per second, overlapping left/right ROI acquisition, two parallel decode workers, stable-frame filtering, and a 128-sample visual fingerprint that avoids spending decode time on the same displayed frame twice.
+- **Cimbar color matrix (experimental)** at `/v3/color/recv.html` and `/v3/color/`: the official browser runtime from `sz3/libcimbar`, using shape and color symbols, Reed–Solomon correction, interleaving, Wirehair fountain coding, and zstd compression. This channel is protocol-incompatible with QRREC's QR modes; use its matching sender and receiver.
+
+The color-matrix runtime is MPL-2.0 software and remains clearly separated from QRREC's MIT-licensed source. Its license, pinned upstream commit, and integration changes are documented in `v3/color/NOTICE.md` and `v3/color/LICENSE.libcimbar`.
 
 ## Why fountain codes
 
@@ -57,6 +67,8 @@ The static site is generated in `release/web-receiver` with these routes:
 
 - `/` and `/send/`: V1 receiver and sender
 - `/v2/` and `/v2/send/`: V2 receiver and sender
+- `/v3/` and `/v3/send/`: optimized V3 dual-QR receiver and sender
+- `/v3/color/recv.html` and `/v3/color/`: V3 color-matrix receiver and sender
 
 Camera access requires HTTPS except on `localhost`. For phone testing, use an HTTPS development origin or deploy the static build.
 
@@ -81,4 +93,4 @@ Built with [node-qrcode](https://github.com/soldair/node-qrcode), [zxing-wasm](h
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+QRREC's own source is MIT; see [LICENSE](LICENSE). The separated libcimbar web runtime under `v3/color/` is MPL-2.0; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
