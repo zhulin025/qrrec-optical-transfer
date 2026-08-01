@@ -12,6 +12,7 @@
       .color-runtime iframe{display:block;width:100%;height:100%;border:0;background:#fff}
       #runtime-wrap[hidden]{display:none}
       .native-note{width:min(92vw,640px);padding:12px 14px;border:1px solid rgba(98,223,160,.24);border-radius:14px;color:#aab3c3;background:rgba(98,223,160,.06);font-size:13px;text-align:center}
+      .session-button{width:min(92vw,640px)}.session-button.stop{background:#d93b50}.session-button:disabled{cursor:not-allowed;opacity:.45;box-shadow:none}
     </style>
   </head>
   <body>
@@ -29,7 +30,8 @@
       </label>
       <div id="file-info" class="file-info">尚未选择文件</div>
     </section>
-    <div class="hint" id="specs">选择文件后开始生成彩色光码</div>
+    <div class="hint" id="specs">选择文件后，点击开始传输</div>
+    <button id="session-button" class="session-button" disabled>开始传输</button>
     <details class="settings">
       <summary>传输设置</summary>
       <div class="row">
@@ -40,7 +42,7 @@
     </details>
     <div class="native-note"><strong>接收端：请使用 QRREC V5 iOS App</strong><br />保持矩阵完整显示，并将发送屏幕亮度调高。</div>
     <div id="runtime-wrap" class="stage-wrap" hidden>
-      <div class="stage color-runtime"><iframe id="runtime" title="V5 彩色矩阵发送画面" src="./runtime-send.html?v=5"></iframe></div>
+      <div class="stage color-runtime"><iframe id="runtime" title="V5 彩色矩阵发送画面" src="about:blank" data-runtime-src="./runtime-send.html?v=6"></iframe></div>
     </div>
     <script type="module" src="./main.ts"></script>
   </body>

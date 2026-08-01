@@ -3,7 +3,7 @@ import WebKit
 
 @MainActor
 final class ReceiverModel: ObservableObject {
-    @Published var status = "正在启动本地解码器…"
+    @Published var status = "点击开始接收后启用摄像头"
     @Published var cameraReady = false
     @Published var decoderReady = false
     @Published var hasError = false
@@ -19,9 +19,26 @@ final class ReceiverModel: ObservableObject {
     @Published var submitFPS = 0.0
     @Published var decodeFPS = 0.0
     @Published var decodedBytes = 0
+    @Published var transferRate = 0.0
     @Published var progress = 0.0
     @Published var completedName: String?
     @Published var completedBytes = 0
+    @Published var isRunning = false
+    fileprivate var sessionStartedAt = Date()
+
+    func beginSession() {
+        status = "正在启动本地解码器…"
+        cameraReady = false; decoderReady = false; hasError = false; isRunning = true
+        captured = 0; submitted = 0; decoded = 0; noData = 0; rejected = 0; errors = 0; inFlight = 0
+        captureFPS = 0; submitFPS = 0; decodeFPS = 0; decodedBytes = 0; progress = 0
+        completedName = nil; completedBytes = 0
+        transferRate = 0; sessionStartedAt = Date()
+    }
+
+    func endSession() {
+        isRunning = false; cameraReady = false
+        status = "接收已结束 · 点击开始可开启新一轮"
+    }
 }
 
 struct CimbarReceiverWebView: UIViewRepresentable {
@@ -79,6 +96,13 @@ struct CimbarReceiverWebView: UIViewRepresentable {
         webView.evaluateJavaScript("window.QRRECV5?.setMode('\(mode)')")
     }
 
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.evaluateJavaScript("Recv?.stop?.()")
+        webView.stopLoading()
+        coordinator.server?.stop()
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: "nativeStatus")
+    }
+
     final class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigationDelegate, WKDownloadDelegate {
         let model: ReceiverModel
         var downloadedFile: Binding<URL?>
@@ -116,6 +140,8 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                     else if self.model.rejected > 0 { self.model.status = "正在扫描画面 · 请保持四角完整清晰" }
                 case "decoded-frame":
                     self.model.decodedBytes += Self.int(info["bytes"])
+                    let elapsed = max(Date().timeIntervalSince(self.model.sessionStartedAt), 0.001)
+                    self.model.transferRate = Double(self.model.decodedBytes) / elapsed
                     self.model.status = "正在接收文件…"
                 case "progress":
                     let values = (info["values"] as? [NSNumber])?.map(\.doubleValue) ?? []
@@ -124,8 +150,14 @@ struct CimbarReceiverWebView: UIViewRepresentable {
                     self.model.completedName = info["name"] as? String ?? "接收文件"
                     self.model.completedBytes = Self.int(info["bytes"])
                     self.model.progress = 1
+                    self.model.isRunning = false
+                    self.model.cameraReady = false
                     self.model.status = "文件接收完成 · 可预览并保存"
-                case "runtime-error": self.model.hasError = true; self.model.status = "解码失败：\(info["reason"] ?? "未知错误")"
+                case "runtime-error":
+                    self.model.hasError = true
+                    self.model.isRunning = false
+                    self.model.cameraReady = false
+                    self.model.status = "解码失败：\(info["reason"] ?? "未知错误")"
                 default: break
                 }
             }

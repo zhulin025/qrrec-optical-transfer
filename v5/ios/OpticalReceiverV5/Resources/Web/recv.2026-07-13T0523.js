@@ -126,12 +126,27 @@ var Recv = function () {
   var _errorFrames = 0;
   var _lastPipelineReport = 0;
   var _pipelineStartedAt = performance.now();
+  var _lastRateAt = _pipelineStartedAt;
+  var _lastRateCaptured = 0;
+  var _lastRateSubmitted = 0;
+  var _lastRateDecoded = 0;
+  var _captureFps = 0;
+  var _submitFps = 0;
+  var _decodeFps = 0;
 
   function reportPipeline(force) {
     const now = performance.now();
     if (!force && now - _lastPipelineReport < 250) return;
     _lastPipelineReport = now;
-    const elapsed = Math.max((now - _pipelineStartedAt) / 1000, 0.001);
+    const elapsed = Math.max((now - _lastRateAt) / 1000, 0.001);
+    const weight = Math.min(1, elapsed / 1.5);
+    _captureFps += (((_capturedFrames - _lastRateCaptured) / elapsed) - _captureFps) * weight;
+    _submitFps += (((_submittedFrames - _lastRateSubmitted) / elapsed) - _submitFps) * weight;
+    _decodeFps += (((_decodedFrames - _lastRateDecoded) / elapsed) - _decodeFps) * weight;
+    _lastRateAt = now;
+    _lastRateCaptured = _capturedFrames;
+    _lastRateSubmitted = _submittedFrames;
+    _lastRateDecoded = _decodedFrames;
     parent.postMessage({
       source: 'qrrec-color',
       type: 'pipeline-stats',
@@ -142,9 +157,9 @@ var Recv = function () {
       rejected: _rejectedFrames,
       errors: _errorFrames,
       inFlight: _framesInFlight,
-      captureFps: _capturedFrames / elapsed,
-      submitFps: _submittedFrames / elapsed,
-      decodeFps: _decodedFrames / elapsed
+      captureFps: _captureFps,
+      submitFps: _submitFps,
+      decodeFps: _decodeFps
     }, location.origin);
   }
 
@@ -271,6 +286,9 @@ var Recv = function () {
         _errorFrames = 0;
         _lastPipelineReport = 0;
         _pipelineStartedAt = performance.now();
+        _lastRateAt = _pipelineStartedAt;
+        _lastRateCaptured = 0; _lastRateSubmitted = 0; _lastRateDecoded = 0;
+        _captureFps = 0; _submitFps = 0; _decodeFps = 0;
       }
       _video = video;
       window.addEventListener('resize', _updateCrosshairPositions);
