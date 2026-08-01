@@ -66,6 +66,10 @@ var Main = function () {
     }
   }
 
+  function notifyRuntimeReady() {
+    window.parent.postMessage({ source: 'qrrec-color-send', type: 'runtime-ready' }, location.origin);
+  }
+
   // public interface
   return {
     init: function (canvas) {
@@ -74,6 +78,7 @@ var Main = function () {
         Send.init_window(canvas);
         Main.setMode('B');
         Send.nextFrame();
+        notifyRuntimeReady();
         return;
       }
     },
@@ -108,6 +113,7 @@ var Main = function () {
 
       Main.setMode('B');
       _ww.postMessage({ fun: 'nextFrame', args: [] });
+      notifyRuntimeReady();
     },
 
 

@@ -17,13 +17,11 @@
     <button id="nav-button"></button><div id="nav-content"></div><span id="current-file"></span><span id="mode-val"></span>
   </div>
   <script src="send.2026-07-13T0523.js?v=3"></script>
-  <script src="main.2026-07-13T0523.js?v=3"></script>
+  <script src="main.2026-07-13T0523.js?v=4"></script>
   <script>
     const canvas=document.getElementById('canvas');
     if(!Main.init_ww(canvas)){
-      var Module={canvas,onRuntimeInitialized(){Main.init(canvas);parent.postMessage({source:'qrrec-color-send',type:'runtime-ready'},location.origin)}};
-    } else {
-      parent.postMessage({source:'qrrec-color-send',type:'runtime-ready'},location.origin);
+      var Module={canvas,onRuntimeInitialized(){Main.init(canvas)}};
     }
   </script>
   <script src="cimbar_js.2026-07-13T0523.js"></script>

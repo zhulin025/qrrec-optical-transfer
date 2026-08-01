@@ -9,6 +9,7 @@ const sessionButton = document.querySelector<HTMLButtonElement>("#session-button
 let selected: File | null = null;
 let active = false;
 let wakeLock: WakeLockSentinel | null = null;
+let startupTimer: number | null = null;
 
 type RuntimeWindow = Window & { Main?: { setFPS(value: string): void; setMode(value: string): void } };
 
@@ -42,20 +43,28 @@ async function startSession() {
   renderSessionState();
   specs.textContent = "正在初始化 libcimbar 编码器…";
   frame.src = frame.dataset.runtimeSrc ?? "./runtime-send.html?v=6";
+  startupTimer = window.setTimeout(() => {
+    if (active) specs.textContent = "编码器启动超时 · 请结束后重试";
+  }, 15000);
   try { wakeLock = await navigator.wakeLock?.request("screen") ?? null; } catch { /* optional */ }
 }
 
 async function endSession() {
   active = false;
+  if (startupTimer !== null) window.clearTimeout(startupTimer);
+  startupTimer = null;
   frame.src = "about:blank";
   await wakeLock?.release().catch(() => undefined);
   wakeLock = null;
   renderSessionState();
 }
 
-frame.addEventListener("load", () => {
-  if (!active || frame.src === "about:blank") return;
-  setTimeout(() => { if (active) { configure(); sendFile(); } }, 200);
+window.addEventListener("message", (event) => {
+  if (!active || event.source !== frame.contentWindow || event.data?.source !== "qrrec-color-send" || event.data?.type !== "runtime-ready") return;
+  if (startupTimer !== null) window.clearTimeout(startupTimer);
+  startupTimer = null;
+  configure();
+  sendFile();
 });
 sessionButton.addEventListener("click", () => active ? void endSession() : void startSession());
 fps.addEventListener("change", configure);
