@@ -180,11 +180,6 @@ function ensureWorkers(workerCount: number): Promise<boolean> {
   return workerInitPromise;
 }
 
-if (!__XHS_MAIN_THREAD__ && typeof Worker === "function" && typeof WebAssembly === "object") {
-  const configuredWorkers = Number((document.getElementById("cfg-workers") as HTMLSelectElement).value);
-  void ensureWorkers(configuredWorkers);
-}
-
 if ("serviceWorker" in navigator && window.isSecureContext) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("./service-worker.js", { scope: "./" });
@@ -196,6 +191,16 @@ window.addEventListener("qrrec:pause", () => {
   captureGen++;
   stream?.getTracks().forEach((track) => track.stop());
   stream = null;
+  workers.forEach((worker) => worker.terminate());
+  workers.length = 0;
+  busy.length = 0;
+  tasks.clear();
+  workerInitPromise = null;
+  workerInitTarget = 0;
+  if (!__XHS_MAIN_THREAD__) {
+    setCapability("worker", "", "待启动");
+    setCapability("wasm", "", "待加载");
+  }
   video.srcObject = null;
   preview.style.display = "none";
   if (!done) {

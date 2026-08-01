@@ -33,7 +33,7 @@ colorPanel.innerHTML = `
     <div class="metric"><div class="k">传输进度</div><div class="v amber" id="color-percent">0%</div></div>
   </div>
   <div class="preview" id="color-preview" style="display:none">
-    <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="./color/recv.html?embed=1"></iframe></div>
+    <div class="color-runtime"><iframe title="彩色矩阵接收画面" allow="camera; fullscreen; screen-wake-lock" data-src="./color/runtime-recv.html?v=1"></iframe></div>
     <div class="scan-guide"><span></span></div>
   </div>
   <section class="transfer-progress" id="color-progress" style="display:none">
@@ -99,6 +99,9 @@ window.addEventListener("message", (event) => {
     colorPanel.querySelector<HTMLElement>("#color-bar")!.style.width = "100%";
     colorPanel.querySelector("#color-percent")!.textContent = "100%";
     colorPanel.querySelector("#color-progress-value")!.textContent = "100%";
+  } else if (message.type === "runtime-error") {
+    capability("color-cap-wasm", "fail", "加载失败");
+    stats.textContent = `彩色矩阵解码器加载失败：${message.reason || "未知错误"}`;
   }
 });
 
@@ -123,3 +126,5 @@ nav.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-v3-tab]");
   if (button) select(button.dataset.v3Tab as "qr" | "color");
 });
+
+select("color");

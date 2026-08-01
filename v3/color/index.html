@@ -19,6 +19,7 @@
     html.qrrec-embed body{background:#fff;background-image:none;display:grid;place-items:center;overflow:hidden;color:#111}
     html.qrrec-embed #nav-container,html.qrrec-embed #status,html.qrrec-embed #invisible_click{display:none!important}
     html.qrrec-embed #dragdrop{outline:0;box-shadow:none;background:#fff;background-image:none;max-width:100vw;max-height:100vh}
+    html.qrrec-embed #canvas{max-width:100vw;max-height:100vh;object-fit:contain}
     html.qrrec-embed .dragdrop::before{display:none}
 
     html,
@@ -382,7 +383,7 @@
 
   <script type="text/javascript">
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./color-sw.js');
+      navigator.serviceWorker.register('./color-sw.js?v=3');
     }
 
     var canvas = document.getElementById('canvas');

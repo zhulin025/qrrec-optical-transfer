@@ -1,4 +1,4 @@
-const CACHE = "qrrec-v3-color-v2";
+const CACHE = "qrrec-v3-color-v3";
 const FILES = [
   "./", "./index.html", "./recv.html",
   "./cimbar_js.2026-07-13T0523.js", "./cimbar_js.2026-07-13T0523.wasm",
@@ -23,7 +23,14 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(
-    (cached) => cached || fetch(event.request),
-  ));
+  const destination = event.request.destination;
+  if (destination === "document" || destination === "script" || destination === "worker") {
+    event.respondWith(fetch(event.request).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+      return response;
+    }).catch(() => caches.match(event.request, { ignoreSearch: true })));
+    return;
+  }
+  event.respondWith(caches.match(event.request, { ignoreSearch: true }).then((cached) => cached || fetch(event.request)));
 });
