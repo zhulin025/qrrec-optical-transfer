@@ -10,6 +10,7 @@ let selected: File | null = null;
 let active = false;
 let wakeLock: WakeLockSentinel | null = null;
 let startupTimer: number | null = null;
+const fullscreenSender = document.body.dataset.fullscreenSender === "true";
 
 type RuntimeWindow = Window & { Main?: { setFPS(value: string): void; setMode(value: string): void } };
 
@@ -33,6 +34,7 @@ function renderSessionState() {
   sessionButton.textContent = active ? "结束传输" : "开始传输";
   sessionButton.classList.toggle("stop", active);
   wrap.hidden = !active;
+  document.body.classList.toggle("session-active", active);
   if (!selected) specs.textContent = "选择文件后，点击开始传输";
   else if (!active) specs.textContent = `${selected.name} 已就绪 · 点击开始传输`;
 }
@@ -41,6 +43,9 @@ async function startSession() {
   if (!selected || active) return;
   active = true;
   renderSessionState();
+  if (fullscreenSender && !document.fullscreenElement) {
+    try { await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch { /* viewport mode remains available */ }
+  }
   specs.textContent = "正在初始化 libcimbar 编码器…";
   frame.src = frame.dataset.runtimeSrc ?? "./runtime-send.html?v=6";
   startupTimer = window.setTimeout(() => {
@@ -57,7 +62,14 @@ async function endSession() {
   await wakeLock?.release().catch(() => undefined);
   wakeLock = null;
   renderSessionState();
+  if (fullscreenSender && document.fullscreenElement) {
+    await document.exitFullscreen().catch(() => undefined);
+  }
 }
+
+document.addEventListener("fullscreenchange", () => {
+  if (fullscreenSender && active && !document.fullscreenElement) void endSession();
+});
 
 window.addEventListener("message", (event) => {
   if (!active || event.source !== frame.contentWindow || event.data?.source !== "qrrec-color-send" || event.data?.type !== "runtime-ready") return;
