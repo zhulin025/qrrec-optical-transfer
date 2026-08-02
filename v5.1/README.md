@@ -6,6 +6,8 @@ V5.1 与 V5 分开维护。V5 已恢复到优化前约 40 KB/s 的 WASM 接收�
 
 V5.1 不包含 WKWebView、JavaScript 或 WASM 解码器。相机只在点击“开始接收”后开启，结束、完成或离开页面时关闭。
 
+配套网页发送端为 `https://qrrec.liuwa.xyz/v5.1/send/`，默认 20 FPS。原 V5 发送端仍保持 15 FPS，两个版本互不改变默认性能参数。
+
 ## 首次准备
 
 OpenCV iOS framework 和编译产物体积较大，位于被 Git 忽略的 `Dependencies/`。首次克隆后运行：
@@ -20,7 +22,7 @@ open ios/OpticalReceiverV51/OpticalReceiverV51.xcodeproj
 
 ## 性能策略
 
-- AVFoundation 以 30 FPS 输出 NV12，直接把 CVPixelBuffer 的 Y/UV 双平面及 stride 传给 C++，不再为每帧申请并复制一份连续 NV12 数组。
+- AVFoundation 优先选择 1080p/60 FPS 格式并输出 NV12；设备不支持时回退 30 FPS。CVPixelBuffer 的 Y/UV 双平面及 stride 直接传给 C++，不再为每帧申请并复制一份连续 NV12 数组。
 - 三个独立 C++ worker 各自持有 OpenCV 缓冲区、码元 Decoder 和透视矩阵，扫描/校正/码元解码可并行运行；喷泉码状态合并仍在单独串行队列完成。
 - 首次定位四个锚点后缓存透视矩阵，普通帧直接校正；每 8 个 worker 帧定期重新定位，连续缓存解码失败时提前重新定位，以兼顾手持移动和吞吐量。
 - worker 忙碌时丢弃旧帧并优先获取最新画面。相机使用 30 FPS 是为了降低与 15 FPS 发送画面相位同步时持续采到过渡帧的概率，不代表所有采集帧都要解码。

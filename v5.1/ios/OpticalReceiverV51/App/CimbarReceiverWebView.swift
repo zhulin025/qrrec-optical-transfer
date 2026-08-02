@@ -205,7 +205,7 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
             session.commitConfiguration(); fail("无法打开后置相机"); return
         }
         session.addInput(input)
-        _ = trySetFrameRate(camera, fps: 30)
+        let configuredFPS = configureCamera(camera, targetFPS: 60)
         let output = AVCaptureVideoDataOutput()
         output.alwaysDiscardsLateVideoFrames = true
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
@@ -223,20 +223,32 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
         session.startRunning()
         Task { @MainActor in
             model.cameraReady = true
-            model.status = "原生相机 1080p · 3 路 C++ 解码器已就绪"
+            model.status = "原生相机 1080p@\(Int(configuredFPS)) · 3 路 C++ 解码器已就绪"
         }
     }
 
-    private func trySetFrameRate(_ camera: AVCaptureDevice, fps: Double) -> Bool {
-        guard camera.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= fps && fps <= $0.maxFrameRate }) else { return false }
+    private func configureCamera(_ camera: AVCaptureDevice, targetFPS: Double) -> Double {
+        let targetFormat = camera.formats.first { format in
+            let size = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            return size.width == 1920 && size.height == 1080 &&
+                format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= targetFPS && targetFPS <= $0.maxFrameRate })
+        }
         do {
             try camera.lockForConfiguration()
+            let fps: Double
+            if let targetFormat {
+                camera.activeFormat = targetFormat
+                fps = targetFPS
+            } else {
+                let maximum = camera.activeFormat.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 30
+                fps = min(30, maximum)
+            }
             let duration = CMTime(value: 1, timescale: CMTimeScale(fps))
             camera.activeVideoMinFrameDuration = duration; camera.activeVideoMaxFrameDuration = duration
             if camera.isFocusModeSupported(.continuousAutoFocus) { camera.focusMode = .continuousAutoFocus }
             if camera.isExposureModeSupported(.continuousAutoExposure) { camera.exposureMode = .continuousAutoExposure }
-            camera.unlockForConfiguration(); return true
-        } catch { return false }
+            camera.unlockForConfiguration(); return fps
+        } catch { return 30 }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

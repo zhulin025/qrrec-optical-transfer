@@ -11,7 +11,7 @@ QRREC 可以让两台设备仅通过“屏幕 + 摄像头”传输文件。发�
 | **V3 多通道实验版** | 继续优化实时接收，并探索彩色高密度编码 | 高速双 QR、画面指纹去重、重叠 ROI 并行搜索；另带 libcimbar 彩色矩阵通道、实时速率/进度/解码统计、完成后媒体预览 | 测试高性能实时传输，或比较双 QR 与彩色矩阵效果 | [接收端](https://qrrec.liuwa.xyz/v3/) · [发送端](https://qrrec.liuwa.xyz/v3/send/) |
 | **V4 先录像后解码版** | 把摄像头采集和 QR 解码分成两个阶段 | 发送端生成有限且可验证的循环并给出建议录像时长；接收端先录像或导入已有视频，停止拍摄后再以 30 FPS 本地离线解码，重组成功即可提前结束 | 手机实时解码跟不上、需要先稳定录下画面再慢慢处理 | [接收端](https://qrrec.liuwa.xyz/v4/) · [发送端](https://qrrec.liuwa.xyz/v4/send/) |
 | **V5 libcimbar iOS 版** | 用原生 App 提高彩色矩阵接收稳定性 | 网页端使用 libcimbar 彩色符号、Reed–Solomon、交织和 Wirehair 喷泉码；iOS App 提供相机权限管理、屏幕常亮、4 路 WASM 解码、沙盒保存和系统分享 | 使用 iPhone 接收彩色高密度光码，希望减少普通移动网页的生命周期与权限限制 | 发送端本地运行 · 接收端使用 QRREC V5 iOS App |
-| **V5.1 原生 C++ 版** | 去掉 WebView/WASM 接收瓶颈 | AVFoundation 直接采集 1080p NV12，原生 C++ libcimbar/OpenCV 解码；独立解码队列、实时性能指标、App 内结果与手动保存 | 在真机上继续提高 libcimbar 吞吐量并观察原生解码性能 | 与 V5 共用网页发送端 · 接收端使用 QRREC V5.1 iOS App |
+| **V5.1 原生 C++ 版** | 去掉 WebView/WASM 接收瓶颈 | AVFoundation 直接采集 1080p NV12，原生 C++ libcimbar/OpenCV 解码；3 路解码、60 FPS 采样、实时性能指标、App 内结果与手动保存 | 在真机上继续提高 libcimbar 吞吐量并观察原生解码性能 | [20 FPS 发送端](https://qrrec.liuwa.xyz/v5.1/send/) · 接收端使用 QRREC V5.1 iOS App |
 
 ### 怎么选择
 
@@ -107,7 +107,7 @@ V5 保留 V3 的暗色视觉语言，但只保留 libcimbar 彩色矩阵通道�
 
 ### V5.1：AVFoundation + C++ 原生接收端
 
-V5.1 保留 V5 的发送码流和界面风格，但建立独立 iOS 工程。相机通过 AVFoundation 直接输出 NV12，帧数据进入本地编译的 libcimbar/OpenCV C++ 解码器，不再经过 WKWebView、Canvas、JavaScript 或 WASM。文件完成后先显示在 App 内，由用户点击保存。构建依赖和使用方法见 [`v5.1/README.md`](v5.1/README.md)。
+V5.1 保留 V5 的码流和界面风格，但建立独立的 20 FPS 网页发送入口与 iOS 工程。相机通过 AVFoundation 以最高 1080p/60 FPS 直接输出 NV12，帧数据进入 3 路本地 libcimbar/OpenCV C++ 解码器，不再经过 WKWebView、Canvas、JavaScript 或 WASM。文件完成后先显示在 App 内，由用户点击保存。构建依赖和使用方法见 [`v5.1/README.md`](v5.1/README.md)。
 
 ## 为什么使用喷泉码
 
@@ -161,6 +161,7 @@ V5.1 首次构建先运行 `v5.1/scripts/prepare_native_ios.sh`，再打开 [`v5
 - `/v3/` 与 `/v3/send/`：V3 接收端与发送端，页面内可切换高速双 QR 和彩色矩阵。
 - `/v4/` 与 `/v4/send/`：V4 录像接收端与固定循环双 QR 发送端。
 - `/v5/send/`：V5 libcimbar 网页发送端；接收端为 iOS App，不提供网页接收路由。
+- `/v5.1/send/`：V5.1 原生 C++ iOS App 配套发送端，默认 20 FPS；识别环境不稳定时可手动降为 15 FPS。
 
 手机调试摄像头时需要 HTTPS 开发地址；普通局域网 HTTP 地址通常无法获得摄像头权限。
 
