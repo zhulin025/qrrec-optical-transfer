@@ -41,16 +41,21 @@ struct ReceiverView: View {
 
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 6) {
                     metric("采集", String(format: "%.1f FPS", model.captureFPS))
-                    metric("解码", String(format: "%.2f FPS", model.decodeFPS), good: model.decodeFPS > 0)
+                    metric("处理", String(format: "%.1f FPS", model.processFPS), good: model.processFPS >= 15)
+                    metric("有效解码", String(format: "%.1f FPS", model.decodeFPS), good: model.decodeFPS >= 13)
                     metric("处理中", "\(model.inFlight)")
-                    metric("采集帧", "\(model.captured)")
                     metric("接收速率", rateText(model.transferRate), good: model.transferRate > 0)
                     metric("成功帧", "\(model.decoded)", good: model.decoded > 0)
                     metric("已收数据", byteText(model.decodedBytes), good: model.decodedBytes > 0)
+                    metric("文件进度", "\(Int(model.progress * 100))%", good: model.progress > 0)
+                    metric("采集帧", "\(model.captured)")
                     metric("未定位", "\(model.rejected)")
                     metric("无数据", "\(model.noData)")
-                    metric("错误", "\(model.errors)", bad: model.errors > 0)
-                    metric("文件进度", "\(Int(model.progress * 100))%", good: model.progress > 0)
+                    metric("忙碌丢帧", "\(model.dropped)", bad: model.dropped > model.captured / 2)
+                    metric("NV12→RGB", String(format: "%.1f ms", model.convertMS))
+                    metric("定位/校正", String(format: "%.1f ms", model.locateMS))
+                    metric("码元解码", String(format: "%.1f ms", model.symbolMS))
+                    metric("定位缓存", String(format: "%.0f%%", model.cacheHitRate * 100), good: model.cacheHitRate > 0.5)
                 }
 
                 if model.progress > 0 && model.progress < 1 {

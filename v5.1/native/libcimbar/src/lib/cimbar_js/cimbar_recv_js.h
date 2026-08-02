@@ -36,6 +36,19 @@ int cimbard_decompress_read(uint32_t id, unsigned char* buffer, unsigned size);
 int cimbard_configure_decode(int mode_val);
 void cimbard_reset_decode();
 
+// Native iOS fast path. Each worker owns its OpenCV buffers, Decoder and
+// cached perspective transform, so scan/decode can run on parallel queues.
+void* cimbard_worker_create();
+void cimbard_worker_destroy(void* worker);
+int cimbard_worker_decode_nv12(
+	void* worker,
+	const unsigned char* y_plane, unsigned y_stride,
+	const unsigned char* uv_plane, unsigned uv_stride,
+	unsigned width, unsigned height,
+	unsigned char* bufspace, unsigned bufsize,
+	double* convert_ms, double* locate_ms, double* decode_ms,
+	int* used_cached_transform);
+
 // testing usage only!
 unsigned char* cimbard_get_reassembled_file_buff();
 

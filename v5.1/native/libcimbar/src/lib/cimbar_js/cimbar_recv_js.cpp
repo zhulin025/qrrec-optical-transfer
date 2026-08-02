@@ -6,6 +6,8 @@
 #include "encoder/Decoder.h"
 #include "encoder/escrow_buffer_writer.h"
 #include "extractor/Extractor.h"
+#include "extractor/Deskewer.h"
+#include "extractor/Scanner.h"
 #include "fountain/fountain_decoder_sink.h"
 #include "serialize/str_join.h"
 #include "util/File.h"
@@ -14,11 +16,61 @@
 #include <opencv2/opencv.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <memory>
 
 
 namespace {
+	using steady_clock = std::chrono::steady_clock;
+
+	double elapsed_ms(const steady_clock::time_point& start)
+	{
+		return std::chrono::duration<double, std::milli>(steady_clock::now() - start).count();
+	}
+
+	struct native_decode_worker
+	{
+		Decoder decoder;
+		cv::Mat rgb;
+		cv::Mat extracted;
+		cv::Mat transform;
+		unsigned cached_uses = 0;
+		unsigned cached_failures = 0;
+		bool cached_should_preprocess = false;
+
+		bool locate(const cv::Mat& input, bool& should_preprocess)
+		{
+			Scanner scanner(input);
+			std::vector<Anchor> points = scanner.scan();
+			if (points.size() < 4)
+				return false;
+
+			Corners corners(points);
+			unsigned anchor = cimbar::Config::anchor_size();
+			unsigned out_w = cimbar::Config::image_size_x();
+			unsigned out_h = cimbar::Config::image_size_y();
+			std::vector<cv::Point2f> output_points({
+				cv::Point2f(anchor, anchor),
+				cv::Point2f(out_w - anchor, anchor),
+				cv::Point2f(anchor, out_h - anchor),
+				cv::Point2f(out_w - anchor, out_h - anchor),
+			});
+			transform = cv::getPerspectiveTransform(corners.all(), output_points);
+			should_preprocess = !corners.is_granular_scale({out_w, out_h});
+			cached_should_preprocess = should_preprocess;
+			cached_uses = 0;
+			cached_failures = 0;
+			return true;
+		}
+
+		void warp(const cv::Mat& input)
+		{
+			cv::Size size(cimbar::Config::image_size_x(), cimbar::Config::image_size_y());
+			cv::warpPerspective(input, extracted, transform, size, cv::INTER_LINEAR);
+		}
+	};
+
 	// for decode
 	std::shared_ptr<fountain_decoder_sink> _sink;
 
@@ -121,6 +173,76 @@ namespace {
 }
 
 extern "C" {
+
+void* cimbard_worker_create()
+{
+	return new (std::nothrow) native_decode_worker();
+}
+
+void cimbard_worker_destroy(void* worker)
+{
+	delete static_cast<native_decode_worker*>(worker);
+}
+
+int cimbard_worker_decode_nv12(
+	void* opaque_worker,
+	const uchar* y_plane, unsigned y_stride,
+	const uchar* uv_plane, unsigned uv_stride,
+	unsigned width, unsigned height,
+	uchar* bufspace, unsigned bufsize,
+	double* convert_ms, double* locate_ms, double* decode_ms,
+	int* used_cached_transform)
+{
+	if (!opaque_worker or !y_plane or !uv_plane or width == 0 or height == 0)
+		return -1;
+
+	unsigned chunks_per_frame = fountain_chunks_per_frame();
+	unsigned chunk_size = fountain_chunk_size();
+	if (bufsize < chunks_per_frame * chunk_size)
+		return -2;
+
+	auto* worker = static_cast<native_decode_worker*>(opaque_worker);
+	auto started = steady_clock::now();
+	cv::Mat y(height, width, CV_8UC1, const_cast<uchar*>(y_plane), y_stride);
+	cv::Mat uv(height / 2, width / 2, CV_8UC2, const_cast<uchar*>(uv_plane), uv_stride);
+	cv::cvtColorTwoPlane(y, uv, worker->rgb, cv::COLOR_YUV2RGB_NV12);
+	if (convert_ms)
+		*convert_ms = elapsed_ms(started);
+
+	// Re-scan periodically, and immediately after two cached decode misses. The
+	// periodic scan tracks hand movement while most frames skip anchor search.
+	bool use_cache = !worker->transform.empty() and worker->cached_uses < 8 and worker->cached_failures < 2;
+	bool should_preprocess = worker->cached_should_preprocess;
+	started = steady_clock::now();
+	if (!use_cache)
+	{
+		if (!worker->locate(worker->rgb, should_preprocess))
+		{
+			if (locate_ms) *locate_ms = elapsed_ms(started);
+			if (decode_ms) *decode_ms = 0;
+			if (used_cached_transform) *used_cached_transform = 0;
+			return -3;
+		}
+	}
+	worker->warp(worker->rgb);
+	if (locate_ms)
+		*locate_ms = elapsed_ms(started);
+	if (used_cached_transform)
+		*used_cached_transform = use_cache ? 1 : 0;
+
+	escrow_buffer_writer writer(bufspace, chunks_per_frame, chunk_size);
+	started = steady_clock::now();
+	worker->decoder.decode_fountain(worker->extracted, writer, should_preprocess);
+	if (decode_ms)
+		*decode_ms = elapsed_ms(started);
+	unsigned bytes = writer.buffers_in_use() * chunk_size;
+	++worker->cached_uses;
+	if (bytes > 0)
+		worker->cached_failures = 0;
+	else
+		++worker->cached_failures;
+	return bytes;
+}
 
 void cimbard_reset_decode()
 {
