@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#090b10" />
+    <title>QRREC V6 高速发送器</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="eyebrow">QRREC V6 · RAPTORQ OPTICAL SENDER</div>
+      <h1>高速光码发送器 V6</h1>
+      <p>V30 四码并行、RaptorQ 抗丢帧与 Worker 预渲染。文件不会上传网络。</p>
+    </header>
+
+    <section class="file-card">
+      <input id="file" type="file" />
+      <label for="file" class="file-pick">
+        <span class="file-icon">＋</span>
+        <span><strong>选择要发送的文件</strong><small>支持图片、视频、文档和压缩包</small></span>
+      </label>
+      <div id="file-info" class="file-info">尚未选择文件</div>
+    </section>
+
+    <div class="hint status-pill" id="status">选择文件后开始生成 V6 高速光码</div>
+
+    <details class="settings">
+      <summary>传输设置</summary>
+      <div class="row">
+        <label>QR 版本<select id="version"><option value="20">V20</option><option value="30" selected>V30</option></select></label>
+        <label>二维码纠错<select id="ecc"><option value="L" selected>L 高容量</option><option value="M">M 稳健</option></select></label>
+        <label>光码数量<select id="parallel"><option value="1">1</option><option value="2">2</option><option value="4" selected>4</option></select></label>
+        <label>播放帧率<select id="fps"><option>15</option><option>20</option><option selected>30</option></select></label>
+        <label>修复冗余<select id="repair"><option value="10">10%</option><option value="20" selected>20%</option><option value="30">30%</option></select></label>
+        <label>RaptorQ 调度<select id="strategy"><option value="balanced" selected>Balanced</option><option value="fast-start">Source first</option><option value="even-spread">Even spread</option></select></label>
+        <label class="v6-check"><input id="compress" type="checkbox" checked />压缩能缩小时自动启用</label>
+      </div>
+      <div class="hint left">默认使用 V30-L、四码、30 FPS。识别困难时优先降为双码或 20 FPS。</div>
+    </details>
+
+    <div class="v6-actions"><button id="start" class="v6-primary">开始高速传输</button></div>
+    <div class="v6-nav"><span>接收端：</span><a href="../">打开 V6 高速接收器</a></div>
+
+    <div class="metrics v6-telemetry">
+      <div class="metric"><div class="k">实际输出</div><div class="v amber" id="actual-rate">0 FPS</div></div>
+      <div class="metric"><div class="k">渲染缓存</div><div class="v" id="cache-info">—</div></div>
+      <div class="metric"><div class="k">传输循环</div><div class="v" id="cycle-info">—</div></div>
+    </div>
+
+    <p class="hint">开始后光码会全屏显示。请调高屏幕亮度，并让四个二维码完整进入接收端取景框。</p>
+    <section id="stage" class="v6-stage-shell"><button id="stop">结束传输</button><div id="qr-grid"></div></section>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

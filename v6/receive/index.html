@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#090b10" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>QRREC V6 高速接收器</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="eyebrow">QRREC V6 · RAPTORQ OPTICAL RECEIVER</div>
+      <h1>高速光码接收器 V6</h1>
+      <p>四码扫描、RaptorQ 重建、CRC32C 与 SHA-256 完整文件校验。</p>
+    </header>
+
+    <div class="hint status-pill" id="status">准备接收 V6 高速光码</div>
+
+    <section class="capabilities" aria-label="运行能力">
+      <div id="cap-secure"><span></span><small>安全环境</small><b>HTTPS</b></div>
+      <div id="cap-camera"><span></span><small>摄像头</small><b>待启动</b></div>
+      <div id="cap-worker"><span></span><small>Worker</small><b>已加载</b></div>
+      <div id="cap-wasm"><span></span><small>RaptorQ</small><b>待码流</b></div>
+    </section>
+
+    <div class="v6-receiver-controls"><button id="record">开启摄像头接收</button></div>
+    <p class="hint">首次使用会申请摄像头权限。请让四个二维码完整进入扫描框并保持设备稳定。</p>
+
+    <div class="preview v6-preview" id="preview">
+      <video id="camera" muted playsinline></video>
+      <canvas id="capture"></canvas>
+      <div class="scan-guide"><span></span></div>
+    </div>
+
+    <section class="transfer-progress" id="progress">
+      <div class="progress-copy">
+        <div><strong>V6 RaptorQ 接收进度</strong><span id="progress-frames">等待有效数据包</span></div>
+        <b id="progress-percent">0%</b>
+      </div>
+      <div class="progress"><div id="bar"></div></div>
+    </section>
+
+    <div class="metrics" id="metrics">
+      <div class="metric"><div class="k">纯传输速率</div><div class="v ok" id="active-speed">等待完成</div></div>
+      <div class="metric"><div class="k">唯一载荷速率</div><div class="v amber" id="payload-rate">0 KiB/s</div></div>
+      <div class="metric"><div class="k">纯传输时间</div><div class="v" id="active-time">0 s</div></div>
+      <div class="metric"><div class="k">唯一数据包</div><div class="v" id="unique">0</div></div>
+      <div class="metric"><div class="k">重复数据包</div><div class="v" id="duplicates">0</div></div>
+      <div class="metric"><div class="k">采集帧率</div><div class="v" id="capture-rate">0 FPS</div></div>
+      <div class="metric"><div class="k">提交帧</div><div class="v" id="submitted">0</div></div>
+      <div class="metric"><div class="k">忙碌替换帧</div><div class="v" id="busy-drop">0</div></div>
+      <div class="metric"><div class="k">单帧解码</div><div class="v" id="decode-time">0 ms</div></div>
+    </div>
+
+    <p class="hint v6-rate-note">主速率按原始文件大小除以第一个唯一有效包至文件校验完成的时间；举起摄像头和初始对焦不计入。</p>
+    <div id="result" class="v6-result"></div>
+    <div class="v6-nav"><span>发送端：</span><a href="./send/">打开 V6 高速发送器</a></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
