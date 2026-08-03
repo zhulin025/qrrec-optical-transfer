@@ -1,0 +1,82 @@
+/* V6 only adds layout required by four-code playback and RaptorQ telemetry.
+   Colors, typography, cards, controls, metrics and scan UI come from the
+   existing QRREC shared/style.css used by V1–V5. */
+.v6-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.v6-nav a { color: var(--accent2); font-weight: 700; }
+.v6-actions { width: min(92vw, 640px); display: grid; gap: 10px; }
+.v6-primary { width: 100%; }
+.v6-check {
+  display: flex;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+  min-height: 34px;
+}
+.v6-check input { width: 19px; height: 19px; accent-color: var(--accent); }
+.v6-telemetry { margin-top: 2px; }
+.v6-stage-shell { display: none; }
+.v6-stage-shell.active {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  background: #000;
+}
+.v6-stage-shell #stop {
+  position: absolute;
+  z-index: 4;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 99px;
+  background: rgba(9,11,16,.82);
+  box-shadow: none;
+  font-size: 13px;
+}
+#qr-grid {
+  display: grid;
+  width: min(96vw, 96vh);
+  height: min(96vw, 96vh);
+  gap: 1.2vmin;
+  padding: 1.5vmin;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #fff;
+}
+#qr-grid.parallel-1 { grid-template-columns: 1fr; }
+#qr-grid.parallel-2 { grid-template-columns: 1fr 1fr; align-items: center; }
+#qr-grid.parallel-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+#qr-grid canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.v6-receiver-controls { width: min(92vw, 520px); display: grid; gap: 10px; }
+.v6-preview { aspect-ratio: 1; overflow: hidden; }
+.v6-preview video { height: 100%; object-fit: cover; }
+.v6-preview canvas { display: none; }
+.v6-rate-note { margin-top: 4px; }
+.v6-result { width: min(92vw, 640px); text-align: center; }
+.v6-result img,.v6-result video { max-width: 100%; border-radius: 14px; }
+.v6-download {
+  display: block;
+  margin-top: 12px;
+  padding: 13px 18px;
+  border-radius: 14px;
+  color: white;
+  background: linear-gradient(135deg,var(--accent),#ff794e);
+  box-shadow: 0 12px 35px rgba(255,91,113,.25);
+  font-weight: 700;
+  text-decoration: none;
+}
+@media (max-width: 560px) {
+  .capabilities { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #qr-grid { border-radius: 10px; }
+}
