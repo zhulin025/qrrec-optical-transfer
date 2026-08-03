@@ -1,5 +1,8 @@
+import AVKit
+import Photos
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct ReceiverView: View {
     @StateObject private var model = ReceiverModel()
@@ -7,16 +10,18 @@ struct ReceiverView: View {
     @State private var receivedURL: URL?
     @State private var hasSession = false
     @State private var sessionID = UUID()
+    @State private var mediaSaveStatus: String?
+    @State private var isSavingMedia = false
 
     var body: some View {
         ZStack {
             Color(red: 0.035, green: 0.043, blue: 0.063).ignoresSafeArea()
             VStack(spacing: 12) {
                 VStack(spacing: 5) {
-                    Text("QRREC V5.1 · NATIVE C++ RECEIVER")
+                    Text("QRREC V5.4 · ADAPTIVE VIEWFINDER")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                         .tracking(2.1).foregroundStyle(Color(red: 1, green: 0.36, blue: 0.44))
-                    Text("高速光码接收器 V5.1")
+                    Text("高速光码接收器 V5.4")
                         .font(.system(size: 29, weight: .bold, design: .rounded))
                     Text("AVFoundation · C++ libcimbar · 原生喷泉码")
                         .font(.footnote).foregroundStyle(.secondary)
@@ -73,6 +78,7 @@ struct ReceiverView: View {
                     } else {
                         model.beginSession()
                         receivedURL = nil
+                        mediaSaveStatus = nil
                         sessionID = UUID()
                         hasSession = true
                     }
@@ -84,22 +90,60 @@ struct ReceiverView: View {
 
                 if let receivedURL {
                     HStack(spacing: 12) {
-                        Image(systemName: "doc.fill").font(.title2).foregroundStyle(Color(red: 0.38, green: 0.87, blue: 0.63))
+                        Image(systemName: mediaKind(for: receivedURL)?.icon ?? "doc.fill").font(.title2).foregroundStyle(Color(red: 0.38, green: 0.87, blue: 0.63))
                         VStack(alignment: .leading, spacing: 2) {
                             Text(model.completedName ?? receivedURL.lastPathComponent).font(.subheadline.bold()).lineLimit(1)
                             Text("已在 App 内接收 · \(byteText(model.completedBytes))").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("保存") { shareURL = receivedURL }.buttonStyle(.borderedProminent)
+                        if mediaKind(for: receivedURL) != nil {
+                            Button(isSavingMedia ? "保存中…" : "保存到相册") { saveMediaToPhotos(receivedURL) }
+                                .buttonStyle(.borderedProminent).disabled(isSavingMedia)
+                        } else {
+                            Button("导出") { shareURL = receivedURL }.buttonStyle(.borderedProminent)
+                        }
                     }
                     .padding(10).background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 12))
+
+                    if let mediaSaveStatus {
+                        Text(mediaSaveStatus)
+                            .font(.caption.bold())
+                            .foregroundStyle(mediaSaveStatus.contains("成功") ? Color(red: 0.38, green: 0.87, blue: 0.63) : Color(red: 1, green: 0.72, blue: 0.42))
+                    }
+                }
+
+                if model.isRunning {
+                    HStack(spacing: 8) {
+                        Image(systemName: model.isOptimalPosition ? "checkmark.circle.fill" : "viewfinder.circle")
+                        Text(model.positionMessage)
+                    }
+                    .font(.caption.bold())
+                    .foregroundStyle(model.isOptimalPosition ? Color.black : Color.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9).padding(.horizontal, 12)
+                    .background(
+                        model.isOptimalPosition ? Color(red: 0.42, green: 1, blue: 0.62) : Color.white.opacity(0.08),
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                    .overlay(RoundedRectangle(cornerRadius: 11).stroke(model.isOptimalPosition ? Color.white.opacity(0.8) : Color.white.opacity(0.1)))
                 }
 
                 ZStack {
-                    if hasSession {
+                    if let receivedURL, mediaKind(for: receivedURL) != nil {
+                        receivedMediaPreview(receivedURL)
+                    } else if hasSession {
                         CimbarReceiverWebView(model: model, downloadedFile: $receivedURL)
+                            .aspectRatio(1, contentMode: .fit)
                             .id(sessionID)
-                        if model.isRunning { ScanCorners().padding(34).allowsHitTesting(false) }
+                        if model.isRunning {
+                            AdaptiveScanGuide(
+                                scale: model.guideScale,
+                                quality: model.guideQuality,
+                                isOptimal: model.isOptimalPosition,
+                                message: model.guideMessage
+                            )
+                            .allowsHitTesting(false)
+                        }
                     } else {
                         VStack(spacing: 12) {
                             Image(systemName: "camera.viewfinder").font(.system(size: 44)).foregroundStyle(.secondary)
@@ -113,7 +157,7 @@ struct ReceiverView: View {
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1)))
                 .shadow(color: .black.opacity(0.45), radius: 28, y: 14)
 
-                Text("将彩色矩阵完整放入取景框。文件接收完成后会先在 App 内预览，再由你选择保存或下载。")
+                Text("正方形预览就是实际识别区域；连续 1 秒达到 100 KB/s 或有效解码 14 FPS，辅助框就会变绿并提示保持不动。")
                     .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
@@ -149,6 +193,57 @@ struct ReceiverView: View {
         return String(format: "%.0f B/s", bytesPerSecond)
     }
 
+    private func mediaKind(for url: URL) -> MediaKind? {
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return nil }
+        if type.conforms(to: .image) { return .image }
+        if type.conforms(to: .movie) || type.conforms(to: .video) { return .video }
+        return nil
+    }
+
+    @ViewBuilder
+    private func receivedMediaPreview(_ url: URL) -> some View {
+        switch mediaKind(for: url) {
+        case .image:
+            if let image = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: image)
+                    .resizable().scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black)
+            }
+        case .video:
+            ReceivedVideoPlayer(url: url)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        case nil:
+            EmptyView()
+        }
+    }
+
+    private func saveMediaToPhotos(_ url: URL) {
+        guard let kind = mediaKind(for: url) else { return }
+        isSavingMedia = true
+        mediaSaveStatus = nil
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                DispatchQueue.main.async {
+                    isSavingMedia = false
+                    mediaSaveStatus = "没有相册写入权限，请在系统设置中允许添加照片"
+                }
+                return
+            }
+            PHPhotoLibrary.shared().performChanges {
+                switch kind {
+                case .image: PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: url)
+                case .video: PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+                }
+            } completionHandler: { success, error in
+                DispatchQueue.main.async {
+                    isSavingMedia = false
+                    mediaSaveStatus = success ? "已成功保存到系统相册" : "保存失败：\(error?.localizedDescription ?? "未知错误")"
+                }
+            }
+        }
+    }
+
     private func capability(_ title: String, _ ready: Bool) -> some View {
         HStack(spacing: 5) {
             Circle().fill(ready ? Color(red: 0.38, green: 0.87, blue: 0.63) : .gray).frame(width: 7, height: 7)
@@ -157,6 +252,27 @@ struct ReceiverView: View {
         .padding(.horizontal, 10).padding(.vertical, 7)
         .background(Color.white.opacity(0.045), in: Capsule())
         .overlay(Capsule().stroke(Color.white.opacity(0.08)))
+    }
+}
+
+private enum MediaKind {
+    case image, video
+    var icon: String { self == .image ? "photo.fill" : "play.rectangle.fill" }
+}
+
+private struct ReceivedVideoPlayer: View {
+    let url: URL
+    @State private var player: AVPlayer
+
+    init(url: URL) {
+        self.url = url
+        _player = State(initialValue: AVPlayer(url: url))
+    }
+
+    var body: some View {
+        VideoPlayer(player: player)
+            .background(Color.black)
+            .onDisappear { player.pause() }
     }
 }
 
@@ -170,16 +286,45 @@ private struct SessionButtonStyle: ButtonStyle {
     }
 }
 
-private struct ScanCorners: View {
+private struct AdaptiveScanGuide: View {
+    let scale: Double
+    let quality: Double
+    let isOptimal: Bool
+    let message: String
+
+    private var guideColor: Color {
+        if isOptimal { return Color(red: 0.42, green: 1, blue: 0.62) }
+        if quality >= 0.30 { return Color(red: 1, green: 0.72, blue: 0.42) }
+        return Color(red: 1, green: 0.36, blue: 0.44)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            Path { path in
-                let w = geo.size.width, h = geo.size.height, d: CGFloat = 28
-                path.move(to: .init(x: 0, y: d)); path.addLine(to: .zero); path.addLine(to: .init(x: d, y: 0))
-                path.move(to: .init(x: w-d, y: 0)); path.addLine(to: .init(x: w, y: 0)); path.addLine(to: .init(x: w, y: d))
-                path.move(to: .init(x: w, y: h-d)); path.addLine(to: .init(x: w, y: h)); path.addLine(to: .init(x: w-d, y: h))
-                path.move(to: .init(x: d, y: h)); path.addLine(to: .init(x: 0, y: h)); path.addLine(to: .init(x: 0, y: h-d))
-            }.stroke(Color(red: 1, green: 0.72, blue: 0.42), style: .init(lineWidth: 3, lineCap: .round))
+            let side = min(geo.size.width, geo.size.height) * CGFloat(scale)
+            let origin = CGPoint(x: (geo.size.width - side) / 2, y: (geo.size.height - side) / 2)
+            let frame = CGRect(origin: origin, size: CGSize(width: side, height: side))
+            let corner = min(CGFloat(34), side * 0.12)
+
+            ZStack {
+                Path { path in
+                    path.move(to: .init(x: frame.minX, y: frame.minY + corner)); path.addLine(to: frame.origin); path.addLine(to: .init(x: frame.minX + corner, y: frame.minY))
+                    path.move(to: .init(x: frame.maxX - corner, y: frame.minY)); path.addLine(to: .init(x: frame.maxX, y: frame.minY)); path.addLine(to: .init(x: frame.maxX, y: frame.minY + corner))
+                    path.move(to: .init(x: frame.maxX, y: frame.maxY - corner)); path.addLine(to: .init(x: frame.maxX, y: frame.maxY)); path.addLine(to: .init(x: frame.maxX - corner, y: frame.maxY))
+                    path.move(to: .init(x: frame.minX + corner, y: frame.maxY)); path.addLine(to: .init(x: frame.minX, y: frame.maxY)); path.addLine(to: .init(x: frame.minX, y: frame.maxY - corner))
+                }
+                .stroke(guideColor, style: .init(lineWidth: isOptimal ? 5 : 3, lineCap: .round))
+                .shadow(color: guideColor.opacity(0.8), radius: isOptimal ? 12 : 3)
+
+                Text(message)
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(.black.opacity(0.72), in: Capsule())
+                    .overlay(Capsule().stroke(guideColor.opacity(0.8)))
+                    .position(x: geo.size.width / 2, y: max(18, frame.minY - 18))
+            }
+            .animation(.easeOut(duration: 0.35), value: scale)
+            .animation(.easeOut(duration: 0.25), value: quality)
         }
     }
 }

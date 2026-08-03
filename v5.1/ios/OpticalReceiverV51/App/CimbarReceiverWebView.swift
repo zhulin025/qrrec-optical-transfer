@@ -47,6 +47,11 @@ final class ReceiverModel: ObservableObject {
     @Published var locateMS = 0.0
     @Published var symbolMS = 0.0
     @Published var cacheHitRate = 0.0
+    @Published var guideQuality = 0.0
+    @Published var guideScale = 0.58
+    @Published var guideMessage = "将完整光码移入辅助框"
+    @Published var isOptimalPosition = false
+    @Published var positionMessage = "将光码完整放入正方形取景区域"
     @Published var completedName: String?
     @Published var completedBytes = 0
     @Published var isRunning = false
@@ -58,6 +63,8 @@ final class ReceiverModel: ObservableObject {
         dropped = 0; inFlight = 0; captureFPS = 0; processFPS = 0; decodeFPS = 0
         decodedBytes = 0; transferRate = 0; progress = 0
         convertMS = 0; locateMS = 0; symbolMS = 0; cacheHitRate = 0
+        guideQuality = 0; guideScale = 0.58; guideMessage = "将完整光码移入辅助框"
+        isOptimalPosition = false; positionMessage = "将光码完整放入正方形取景区域"
         completedName = nil; completedBytes = 0
     }
 
@@ -127,6 +134,8 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
     private var windowProcessed = 0
     private var windowDecoded = 0
     private var windowBytes = 0
+    private var windowRejected = 0
+    private var optimalWindows = 0
     private var captured = 0
     private var processed = 0
     private var decoded = 0
@@ -156,6 +165,8 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
 
     @MainActor func attach(_ view: PreviewView) {
         view.previewLayer.session = session
+        // The square preview and the native decoder use the same center crop.
+        view.backgroundColor = .black
         view.previewLayer.videoGravity = .resizeAspectFill
     }
 
@@ -189,7 +200,8 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
         lock.withLock {
             let now = CACurrentMediaTime()
             windowStartedAt = now
-            windowCaptured = 0; windowProcessed = 0; windowDecoded = 0; windowBytes = 0
+            windowCaptured = 0; windowProcessed = 0; windowDecoded = 0; windowBytes = 0; windowRejected = 0
+            optimalWindows = 0
             captured = 0; processed = 0; decoded = 0; decodedBytes = 0
             rejected = 0; noData = 0; errors = 0; dropped = 0; inFlight = 0
             stageSamples = 0; convertTotal = 0; locateTotal = 0; symbolTotal = 0; cacheHits = 0
@@ -270,14 +282,21 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
         CVPixelBufferLockBaseAddress(pixel, .readOnly)
         let width = CVPixelBufferGetWidthOfPlane(pixel, 0)
         let height = CVPixelBufferGetHeightOfPlane(pixel, 0)
+        let side = min(width, height)
+        let cropX = ((width - side) / 2) & ~1
+        let cropY = ((height - side) / 2) & ~1
         let result: Int32
         if let y = CVPixelBufferGetBaseAddressOfPlane(pixel, 0), let uv = CVPixelBufferGetBaseAddressOfPlane(pixel, 1) {
+            let yStride = CVPixelBufferGetBytesPerRowOfPlane(pixel, 0)
+            let uvStride = CVPixelBufferGetBytesPerRowOfPlane(pixel, 1)
+            let croppedY = y.advanced(by: cropY * yStride + cropX)
+            let croppedUV = uv.advanced(by: (cropY / 2) * uvStride + cropX)
             result = slot.output.withUnsafeMutableBufferPointer { out in
                 cimbarWorkerDecode(
                     slot.worker,
-                    y.assumingMemoryBound(to: UInt8.self), UInt32(CVPixelBufferGetBytesPerRowOfPlane(pixel, 0)),
-                    uv.assumingMemoryBound(to: UInt8.self), UInt32(CVPixelBufferGetBytesPerRowOfPlane(pixel, 1)),
-                    UInt32(width), UInt32(height), out.baseAddress!, UInt32(out.count),
+                    croppedY.assumingMemoryBound(to: UInt8.self), UInt32(yStride),
+                    croppedUV.assumingMemoryBound(to: UInt8.self), UInt32(uvStride),
+                    UInt32(side), UInt32(side), out.baseAddress!, UInt32(out.count),
                     &conversion, &location, &symbols, &usedCache
                 )
             }
@@ -316,7 +335,7 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
             if result > 0 {
                 decoded += 1; windowDecoded += 1; decodedBytes += bytes; windowBytes += bytes
             } else if result == 0 { noData += 1 }
-            else if result == -3 { rejected += 1 }
+            else if result == -3 { rejected += 1; windowRejected += 1 }
             else { errors += 1 }
         }
         publishIfNeeded(now: now)
@@ -324,7 +343,8 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
 
     private struct Snapshot: Sendable {
         let captured, processed, decoded, bytes, rejected, noData, errors, dropped, inFlight: Int
-        let captureFPS, processFPS, decodeFPS, rate, convertMS, locateMS, symbolMS, cacheRate: Double
+        let captureFPS, processFPS, decodeFPS, rate, rejectRate, convertMS, locateMS, symbolMS, cacheRate: Double
+        let isOptimal: Bool
     }
 
     private func publishIfNeeded(now: CFTimeInterval) {
@@ -332,17 +352,32 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
             let elapsed = now - windowStartedAt
             guard elapsed >= 0.5 else { return nil }
             let sampleCount = max(stageSamples, 1)
+            let processFPS = Double(windowProcessed) / elapsed
+            let decodeFPS = Double(windowDecoded) / elapsed
+            let rate = Double(windowBytes) / elapsed
+            let rejectRate = Double(windowRejected) / Double(max(windowProcessed, 1))
+            // Either strong signal is enough: once users reach a useful speed,
+            // asking them to keep moving usually forces a costly re-localization.
+            let candidate = rate >= 100 * 1024 || decodeFPS >= 14
+            let clearlyPoor = rate < 70 * 1024 && decodeFPS < 10
+            if candidate {
+                optimalWindows = min(optimalWindows + 1, 5)
+                if optimalWindows >= 2 { optimalWindows = 5 }
+            } else if clearlyPoor {
+                optimalWindows = max(optimalWindows - 1, 0)
+            }
             let snap = Snapshot(
                 captured: captured, processed: processed, decoded: decoded, bytes: decodedBytes,
                 rejected: rejected, noData: noData, errors: errors, dropped: dropped, inFlight: inFlight,
                 captureFPS: Double(windowCaptured) / elapsed,
-                processFPS: Double(windowProcessed) / elapsed,
-                decodeFPS: Double(windowDecoded) / elapsed,
-                rate: Double(windowBytes) / elapsed,
+                processFPS: processFPS,
+                decodeFPS: decodeFPS,
+                rate: rate, rejectRate: rejectRate,
                 convertMS: convertTotal / Double(sampleCount), locateMS: locateTotal / Double(sampleCount),
-                symbolMS: symbolTotal / Double(sampleCount), cacheRate: Double(cacheHits) / Double(sampleCount)
+                symbolMS: symbolTotal / Double(sampleCount), cacheRate: Double(cacheHits) / Double(sampleCount),
+                isOptimal: optimalWindows >= 3
             )
-            windowStartedAt = now; windowCaptured = 0; windowProcessed = 0; windowDecoded = 0; windowBytes = 0
+            windowStartedAt = now; windowCaptured = 0; windowProcessed = 0; windowDecoded = 0; windowBytes = 0; windowRejected = 0
             return snap
         }
         guard let snapshot else { return }
@@ -355,6 +390,25 @@ final class NativeCameraCoordinator: NSObject, AVCaptureVideoDataOutputSampleBuf
             model.transferRate = snapshot.rate; model.progress = max(model.progress, progress)
             model.convertMS = snapshot.convertMS; model.locateMS = snapshot.locateMS
             model.symbolMS = snapshot.symbolMS; model.cacheHitRate = snapshot.cacheRate
+            let throughputScore = min(snapshot.decodeFPS / 20.0, 1)
+            let successRatio = min(snapshot.decodeFPS / max(snapshot.processFPS, 1), 1)
+            let rawQuality = max(0, min(1, throughputScore * 0.55 + successRatio * 0.30 + snapshot.cacheRate * 0.15))
+            model.guideQuality = model.guideQuality * 0.65 + rawQuality * 0.35
+            model.guideScale = 0.58 + model.guideQuality * 0.32
+            model.isOptimalPosition = snapshot.isOptimal
+            if snapshot.isOptimal {
+                model.guideMessage = "速度最优 · 保持不动"
+                model.positionMessage = "当前取景位置速度最优，请保持当前位置，不要再调整"
+            } else if model.guideQuality >= 0.30 {
+                model.guideMessage = "正在接近最佳位置 · 缓慢微调"
+                model.positionMessage = "正在接近最佳位置，请缓慢调整距离和角度"
+            } else if snapshot.rejected > 0 {
+                model.guideMessage = "未完整定位 · 调整距离与角度"
+                model.positionMessage = "未定位帧较多，请让光码完整对准正方形区域"
+            } else {
+                model.guideMessage = "将完整光码移入辅助框"
+                model.positionMessage = "将光码完整放入正方形取景区域"
+            }
             if snapshot.decoded > 0 { model.status = "正在接收文件…" }
             else if snapshot.rejected > 0 { model.status = "正在扫描画面 · 请保持四角完整清晰" }
         }
